@@ -1,0 +1,14 @@
+name: marten_calendar
+version: 0.1.0
+
+dependencies:
+  marten:
+    github: martenframework/marten
+development_dependencies:
+  sqlite3:
+    github: crystal-lang/crystal-sqlite3
+  ameba:
+    github: crystal-ameba/ameba
+    version: ~> 1.6
+  timecop:
+    github: crystal-community/timecop.cr

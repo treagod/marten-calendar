@@ -1,0 +1,5 @@
+{% if calendar_cell.blank? %}
+<span class="custom-cell blank">-</span>
+{% else %}
+<span class="custom-cell day">{{ calendar_cell.day }}</span>
+{% endif %}

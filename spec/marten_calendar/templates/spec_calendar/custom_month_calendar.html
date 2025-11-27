@@ -1,0 +1,8 @@
+<div class="custom-month">
+  Custom Month Template {{ month_calendar.month }}/{{ month_calendar.year }}
+  {% for week_row in month_calendar.calendar_cells %}
+    {% for calendar_cell in week_row %}
+      {% include cell_template_path with calendar_cell=calendar_cell %}
+    {% endfor %}
+  {% endfor %}
+</div>

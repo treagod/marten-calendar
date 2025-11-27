@@ -1,0 +1,195 @@
+{% extend "base.html" %}
+{% block head %}
+{% endblock head %}
+{% block content %}
+<style>
+:root {
+  /* Farben – feel free to tweak */
+  --cal-bg: #ffffff;
+  --cal-border: #e3e7ef;
+  --cal-muted: #9aa2b2;
+  --cal-text: #111827;
+  --cal-today-bg: #2563eb;
+  --cal-today-text: #ffffff;
+  --cal-selected-bg: #0f766e;
+  --cal-selected-text: #ffffff;
+  --cal-adjacent-text: #cbd0dd;
+  --cal-disabled-text: #d1d5db;
+  --cal-hover-bg: #f3f4f6;
+
+  --cal-radius: 12px;
+  --cal-shadow: 0 18px 45px rgba(15, 23, 42, 0.10);
+  --cal-font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* Calendar wrapper */
+.calendar-widget {
+  margin: 40px 16px;
+  background: var(--cal-bg);
+  border-radius: var(--cal-radius);
+  box-shadow: var(--cal-shadow);
+  padding: 16px 16px 18px;
+  max-width: 360px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Header mit Titel und Navigation */
+.calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.calendar-title {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.calendar-title-month {
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  color: var(--cal-muted);
+}
+
+.calendar-title-year {
+  font-weight: 600;
+  font-size: 1.15rem;
+}
+
+.calendar-nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid var(--cal-border);
+  text-decoration: none;
+  color: var(--cal-muted);
+  font-size: 0.9rem;
+  background: #f9fafb;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.08s ease;
+}
+
+.calendar-nav:hover {
+  background: #e5e7eb;
+  border-color: #cbd5f5;
+  color: #111827;
+  transform: translateY(-1px);
+}
+
+/* Tabelle */
+.calendar-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 0.85rem;
+}
+
+/* Wochentage */
+.calendar-table thead th {
+  padding: 6px 0 8px;
+  font-weight: 500;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.7rem;
+  color: var(--cal-muted);
+}
+
+/* Zellen */
+.calendar-table td {
+  padding: 4px 0;
+  text-align: center;
+  height: 40px;
+  box-sizing: border-box;
+}
+
+/* Time-Element: runder Tag */
+.calendar-table time {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.9rem;
+  color: var(--cal-text);
+  transition: background 0.15s ease, color 0.15s ease, transform 0.08s ease, box-shadow 0.08s ease;
+  cursor: default;
+}
+
+/* Hover für "normale" Tage */
+.calendar-table td:not(.disabled):not(.adjacent-prev-month):not(.adjacent-next-month) time:hover {
+  background: var(--cal-hover-bg);
+  transform: translateY(-1px);
+}
+
+/* Adjacent-Monate */
+.calendar-table td.adjacent-prev-month time,
+.calendar-table td.adjacent-next-month time {
+  color: var(--cal-adjacent-text);
+}
+
+/* Disabled-Tage */
+.calendar-table td.disabled time {
+  color: var(--cal-disabled-text);
+  text-decoration: line-through;
+  cursor: not-allowed;
+}
+
+/* Heute */
+.calendar-table td.today time {
+  background: var(--cal-today-bg);
+  color: var(--cal-today-text);
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.12);
+}
+
+/* Selected */
+.calendar-table td.selected time {
+  background: var(--cal-selected-bg);
+  color: var(--cal-selected-text);
+  box-shadow: 0 0 0 1px rgba(15, 118, 110, 0.20);
+}
+
+/* Kombination: today + selected (falls du das mal brauchst) */
+.calendar-table td.today.selected time {
+  background: linear-gradient(135deg, var(--cal-today-bg), var(--cal-selected-bg));
+}
+
+/* Blank-Zellen (falls du welche hast) */
+.calendar-table td.blank {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Kleine Smartphone-Anpassung */
+@media (max-width: 420px) {
+  .calendar-widget {
+    margin-top: 24px;
+    max-width: 100%;
+  }
+
+  .calendar-table thead th {
+    font-size: 0.65rem;
+  }
+
+  .calendar-table time {
+    width: 2rem;
+    height: 2rem;
+    font-size: 0.8rem;
+  }
+}</style>
+<div>
+    <h1>Calendar</h1>
+</div>
+<div>
+    {% calendar year: calendar_year, month: calendar_month, fill_adjacent: true, min: "20.11.2025"  %}
+</div>
+{% endblock content %}

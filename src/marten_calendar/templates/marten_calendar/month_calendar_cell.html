@@ -1,0 +1,20 @@
+<td
+    {% if calendar_cell.has_classes? %}
+    class="
+    {% if calendar_cell.blank? %}blank{% endif %}
+    {% if calendar_cell.today? %}today{% endif %}
+    {% if calendar_cell.disabled? %}disabled{% endif %}
+    {% if calendar_cell.selected? %}selected{% endif %}
+    {% if calendar_cell.adjacent_prev_month? %}adjacent-prev-month{% endif %}
+    {% if calendar_cell.adjacent_next_month? %}adjacent-next-month{% endif %}
+    "
+    {% endif %}
+    {% if calendar_cell.today? %}aria-current="date"{% endif %}
+    {% if calendar_cell.disabled? %}aria-disabled="true"{% endif %}
+    {% if calendar_cell.selected? %}aria-selected="true"{% endif %}
+    {% if calendar_cell.blank? %}aria-hidden="true"{% endif %}
+>
+    {% if not calendar_cell.blank? %}
+      <time datetime="{{ calendar_cell.iso }}">{{ calendar_cell.day }}</time>
+    {% endif %}
+</td>

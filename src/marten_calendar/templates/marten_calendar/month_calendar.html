@@ -1,0 +1,34 @@
+<section class="marten-calendar" aria-label="Calendar {{ month_calendar.month }}/{{ month_calendar.year }}">
+    <div class="calendar-header">
+      {% if previous_path %}
+        <a href="{{ previous_path }}" class="nav-prev">«</a>
+      {% endif %}
+
+      <span class="calendar-title">
+        {{ month_calendar.month_title }} {{ month_calendar.year }}
+      </span>
+
+      {% if next_path %}
+        <a href="{{ next_path }}" class="nav-next">»</a>
+      {% endif %}
+    </div>
+    <table class="calendar-table" role="grid">
+        <thead>
+            <tr>
+                {% for weekday_name in month_calendar.weekday_names %}
+                <th scope="col">{{ weekday_name }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+
+            {% for week_row in month_calendar.calendar_cells %}
+            <tr>
+            {% for calendar_cell in week_row %}
+            {% include cell_template_path with calendar_cell=calendar_cell %}
+            {% endfor %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
