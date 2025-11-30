@@ -1,0 +1,25 @@
+fr:
+  marten_calendar:
+    calendar:
+      label: "Calendrier"
+      month_names:
+        january: "Janvier"
+        february: "Février"
+        march: "Mars"
+        april: "Avril"
+        may: "Mai"
+        june: "Juin"
+        july: "Juillet"
+        august: "Août"
+        september: "Septembre"
+        october: "Octobre"
+        november: "Novembre"
+        december: "Décembre"
+      weekday_names:
+        monday: "Lun"
+        tuesday: "Mar"
+        wednesday: "Mer"
+        thursday: "Jeu"
+        friday: "Ven"
+        saturday: "Sam"
+        sunday: "Dim"

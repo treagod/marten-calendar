@@ -10,6 +10,10 @@ require "sqlite3"
 require "../src/marten_calendar"
 require "./support/**"
 
+Marten.settings.installed_apps = [
+  MartenCalendar::App,
+] of Marten::Apps::Config.class
+
 module MartenCalendarSpec
   TEMPLATE_ROOT      = File.expand_path("../src/marten_calendar/templates", __DIR__)
   SPEC_TEMPLATE_ROOT = File.expand_path("./marten_calendar/templates", __DIR__)

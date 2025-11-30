@@ -102,7 +102,7 @@ module MartenCalendar
         first_day = Time.utc(year, month, 1)
         days_in_month = Time.days_in_month(year, month)
         first_weekday = monday_start ? (first_day.day_of_week.value - 1) : (first_day.day_of_week.value % 7)
-        weekday_names = monday_start ? %w[Mon Tue Wed Thu Fri Sat Sun] : %w[Sun Mon Tue Wed Thu Fri Sat]
+        weekday_names = localized_weekday_names(monday_start)
 
         prev_y, prev_m = prev_month_tuple(year, month)
         next_y, next_m = next_month_tuple(year, month)
@@ -196,11 +196,14 @@ module MartenCalendar
           next_month: next_m
         )
 
+        calendar_label = localized_calendar_label
+
         Marten.templates.get_template(tmpl_path).render({
           "month_calendar"     => month_calendar,
           "cell_template_path" => cell_tmpl_path,
           "next_path"          => next_path,
           "previous_path"      => previous_path,
+          "calendar_label"     => calendar_label,
         })
       end
 
@@ -337,7 +340,17 @@ module MartenCalendar
       end
 
       private def month_title(month : Int32) : String
-        %w(January February March April May June July August September October November December)[month - 1]
+        key = MONTH_KEYS[month - 1]
+        I18n.t!("marten_calendar.calendar.month_names.#{key}")
+      end
+
+      private def localized_calendar_label : String
+        I18n.t!("marten_calendar.calendar.label")
+      end
+
+      private def localized_weekday_names(monday_start : Bool) : Array(String)
+        keys = monday_start ? WEEKDAY_KEYS_MONDAY_START : WEEKDAY_KEYS_SUNDAY_START
+        keys.map { |key| I18n.t!("marten_calendar.calendar.weekday_names.#{key}") }
       end
 
       private def build_nav_paths(
@@ -386,6 +399,41 @@ module MartenCalendar
       private def format_iso(y : Int32, m : Int32, d : Int32) : String
         "#{y}-#{sprintf("%02d", m)}-#{sprintf("%02d", d)}"
       end
+
+      MONTH_KEYS = %w(
+        january
+        february
+        march
+        april
+        may
+        june
+        july
+        august
+        september
+        october
+        november
+        december
+      )
+
+      WEEKDAY_KEYS_MONDAY_START = %w(
+        monday
+        tuesday
+        wednesday
+        thursday
+        friday
+        saturday
+        sunday
+      )
+
+      WEEKDAY_KEYS_SUNDAY_START = %w(
+        sunday
+        monday
+        tuesday
+        wednesday
+        thursday
+        friday
+        saturday
+      )
 
       DEFAULT_DATE_INPUT_FORMATS = [
         "%Y-%m-%d",
