@@ -2,6 +2,8 @@ fr:
   marten_calendar:
     calendar:
       label: "Calendrier"
+      prev_label: "«"
+      next_label: "»"
       month_names:
         january: "Janvier"
         february: "Février"

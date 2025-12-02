@@ -83,6 +83,8 @@ en:
   marten_calendar:
     calendar:
       label: "Calendar"
+      prev_label: "«"
+      next_label: "»"
       month_names:
         january: "January"
         february: "February"

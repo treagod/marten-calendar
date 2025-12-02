@@ -196,14 +196,11 @@ module MartenCalendar
           next_month: next_m
         )
 
-        calendar_label = localized_calendar_label
-
         Marten.templates.get_template(tmpl_path).render({
           "month_calendar"     => month_calendar,
           "cell_template_path" => cell_tmpl_path,
           "next_path"          => next_path,
           "previous_path"      => previous_path,
-          "calendar_label"     => calendar_label,
         })
       end
 
@@ -342,10 +339,6 @@ module MartenCalendar
       private def month_title(month : Int32) : String
         key = MONTH_KEYS[month - 1]
         I18n.t!("marten_calendar.calendar.month_names.#{key}")
-      end
-
-      private def localized_calendar_label : String
-        I18n.t!("marten_calendar.calendar.label")
       end
 
       private def localized_weekday_names(monday_start : Bool) : Array(String)

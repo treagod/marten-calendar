@@ -1,7 +1,7 @@
-<section class="marten-calendar" aria-label="{{ calendar_label }} {{ month_calendar.month }}/{{ month_calendar.year }}">
+<section class="marten-calendar" aria-label="{% t 'marten_calendar.calendar.label' %} {{ month_calendar.month }}/{{ month_calendar.year }}">
     <div class="calendar-header">
       {% if previous_path %}
-        <a href="{{ previous_path }}" class="nav-prev">«</a>
+        <a href="{{ previous_path }}" class="nav-prev">{% t 'marten_calendar.calendar.prev_label' %}</a>
       {% endif %}
 
       <span class="calendar-title">
@@ -9,7 +9,7 @@
       </span>
 
       {% if next_path %}
-        <a href="{{ next_path }}" class="nav-next">»</a>
+        <a href="{{ next_path }}" class="nav-next">{% t 'marten_calendar.calendar.next_label' %}</a>
       {% endif %}
     </div>
     <table class="calendar-table" role="grid">
