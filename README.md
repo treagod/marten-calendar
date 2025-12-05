@@ -13,6 +13,7 @@ Marten Calendar is a Marten extension that provides the foundation for calendar-
 - [x] Current calendar rendering functionality
 - [x] Localized labels and weekday/month translations
 - [ ] Month calendar event support
+- [ ] Ready to use CSS Styling 
 
 ## Installation
 
