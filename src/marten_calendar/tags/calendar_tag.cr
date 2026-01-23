@@ -365,28 +365,35 @@ module MartenCalendar
         req = raw.as(Marten::HTTP::Request)
 
         base_uri = URI.parse(req.full_path.dup)
+        base_params = extract_query_params(base_uri)
 
-        next_uri = URI.parse(base_uri.to_s)
-        prev_uri = URI.parse(base_uri.to_s)
+        next_uri = build_month_year_uri(base_uri, base_params, next_year, next_month)
+        prev_uri = build_month_year_uri(base_uri, base_params, prev_year, prev_month)
 
-        update_month_year_query(next_uri, next_year, next_month)
-        update_month_year_query(prev_uri, prev_year, prev_month)
-
-        {next_uri.to_s, prev_uri.to_s}
+        {next_uri, prev_uri}
       end
 
-      private def update_month_year_query(uri : URI, year : Int32, month : Int32) : Nil
-        params =
-          if query = uri.query
-            URI::Params.parse(query)
-          else
-            URI::Params.new
-          end
+      private def extract_query_params(uri : URI) : URI::Params
+        if query = uri.query
+          URI::Params.parse(query)
+        else
+          URI::Params.new
+        end
+      end
 
+      private def build_month_year_uri(
+        base_uri : URI,
+        base_params : URI::Params,
+        year : Int32,
+        month : Int32,
+      ) : String
+        params = base_params.dup
         params["year"] = year.to_s
         params["month"] = month.to_s
 
-        uri.query = params.to_s
+        nav_uri = base_uri.dup
+        nav_uri.query = params.to_s
+        nav_uri.to_s
       end
 
       private def format_iso(y : Int32, m : Int32, d : Int32) : String
