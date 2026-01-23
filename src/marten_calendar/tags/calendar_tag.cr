@@ -204,146 +204,19 @@ module MartenCalendar
         })
       end
 
-      private def today_utc : Time
-        Time.local.to_utc
-      end
+      private def build_month_year_uri(
+        base_uri : URI,
+        base_params : URI::Params,
+        year : Int32,
+        month : Int32,
+      ) : String
+        params = base_params.dup
+        params["year"] = year.to_s
+        params["month"] = month.to_s
 
-      private def same_day?(a : Time, b : Time) : Bool
-        au = a.to_utc; bu = b.to_utc
-        au.year == bu.year && au.month == bu.month && au.day == bu.day
-      end
-
-      private def disabled?(date : Time, min : Time?, max : Time?) : Bool
-        (!min.nil? && date_lt?(date, min.not_nil!)) ||
-          (!max.nil? && date_gt?(date, max.not_nil!))
-      end
-
-      private def selected?(date : Time, default : Time?, disabled_flag : Bool) : Bool
-        return false unless default
-        return false if disabled_flag
-        same_day?(date, default.not_nil!)
-      end
-
-      private def date_lt?(a : Time, b : Time) : Bool
-        {a.year, a.month, a.day} < {b.year, b.month, b.day}
-      end
-
-      private def date_gt?(a : Time, b : Time) : Bool
-        {a.year, a.month, a.day} > {b.year, b.month, b.day}
-      end
-
-      private def normalize_year_month(y : Int32, m : Int32) : {Int32, Int32}
-        q, r = (m - 1).divmod(12)
-        {y + q, r + 1}
-      end
-
-      private def resolve_date(ctx, key) : Time?
-        val = @kwargs[key]?.try(&.resolve(ctx))
-        return unless val
-
-        case val
-        when Time
-          Time.utc(val.year, val.month, val.day)
-        when Marten::Template::Value
-          v = val.raw
-          return v if v.is_a?(Time)
-          parse_localized_date(v.to_s)
-        else
-          parse_iso_date(val.to_s)
-        end
-      end
-
-      private def parse_localized_date(s : String) : Time?
-        tz = Marten.settings.time_zone || Time::Location.load("UTC")
-
-        if t = try_parse(s, "%F", tz)
-          return t
-        end
-
-        fmts = i18n_date_input_formats + DEFAULT_DATE_INPUT_FORMATS
-        fmts.each do |fmt|
-          if t = try_parse(s, fmt, tz)
-            return t
-          end
-        end
-
-        nil
-      end
-
-      private def i18n_date_input_formats : Array(String)
-        fmts = [] of String
-        idx = 0
-
-        while fmt = fetch_localized_date_format(idx)
-          fmts << fmt
-          idx += 1
-        end
-
-        fmts
-      end
-
-      private def fetch_localized_date_format(index : Int32) : String?
-        I18n.t!("marten.schema.field.date.input_formats.#{index}").to_s
-      rescue I18n::Errors::MissingTranslation
-        nil
-      end
-
-      private def try_parse(s : String, fmt : String, tz : Time::Location) : Time?
-        Time.parse(s, fmt, tz)
-      rescue
-        nil
-      end
-
-      private def parse_iso_date(s : String) : Time?
-        return nil unless s.size >= 10
-        y = s[0, 4].to_i?; m = s[5, 2].to_i?; d = s[8, 2].to_i?
-        return nil if y.nil? || m.nil? || d.nil?
-        Time.utc(y, m, d) rescue nil
-      end
-
-      private def resolve_int(ctx, key) : Int32?
-        @kwargs[key]?.try { |f| f.resolve(ctx).to_s.to_i? }
-      end
-
-      private def parse_week_start(s : String?) : Bool
-        case s.try &.downcase
-        when "sunday"      then false
-        when "monday", nil then true
-        else                    true
-        end
-      end
-
-      private def resolve_str(ctx, key) : String?
-        @kwargs[key]?.try { |f| f.resolve(ctx).to_s }
-      end
-
-      private def resolve_bool(ctx, key, fallback : Bool) : Bool
-        raw = @kwargs[key]?.try(&.resolve(ctx))
-        return fallback if raw.nil?
-        case raw
-        when Bool then raw
-        else
-          s = raw.to_s.downcase
-          {"1", "true", "t", "yes", "y", "on"}.includes?(s)
-        end
-      end
-
-      private def prev_month_tuple(y : Int32, m : Int32) : {Int32, Int32}
-        m == 1 ? {y - 1, 12} : {y, m - 1}
-      end
-
-      private def next_month_tuple(y : Int32, m : Int32) : {Int32, Int32}
-        m == 12 ? {y + 1, 1} : {y, m + 1}
-      end
-
-      private def month_title(month : Int32) : String
-        key = MONTH_KEYS[month - 1]
-        I18n.t!("marten_calendar.calendar.month_names.#{key}")
-      end
-
-      private def localized_weekday_names(monday_start : Bool) : Array(String)
-        keys = monday_start ? WEEKDAY_KEYS_MONDAY_START : WEEKDAY_KEYS_SUNDAY_START
-        keys.map { |key| I18n.t!("marten_calendar.calendar.weekday_names.#{key}") }
+        nav_uri = base_uri.dup
+        nav_uri.query = params.to_s
+        nav_uri.to_s
       end
 
       private def build_nav_paths(
@@ -373,6 +246,19 @@ module MartenCalendar
         {next_uri, prev_uri}
       end
 
+      private def date_gt?(a : Time, b : Time) : Bool
+        {a.year, a.month, a.day} > {b.year, b.month, b.day}
+      end
+
+      private def date_lt?(a : Time, b : Time) : Bool
+        {a.year, a.month, a.day} < {b.year, b.month, b.day}
+      end
+
+      private def disabled?(date : Time, min : Time?, max : Time?) : Bool
+        (!min.nil? && date_lt?(date, min.not_nil!)) ||
+          (!max.nil? && date_gt?(date, max.not_nil!))
+      end
+
       private def extract_query_params(uri : URI) : URI::Params
         if query = uri.query
           URI::Params.parse(query)
@@ -381,23 +267,137 @@ module MartenCalendar
         end
       end
 
-      private def build_month_year_uri(
-        base_uri : URI,
-        base_params : URI::Params,
-        year : Int32,
-        month : Int32,
-      ) : String
-        params = base_params.dup
-        params["year"] = year.to_s
-        params["month"] = month.to_s
-
-        nav_uri = base_uri.dup
-        nav_uri.query = params.to_s
-        nav_uri.to_s
+      private def fetch_localized_date_format(index : Int32) : String?
+        I18n.t!("marten.schema.field.date.input_formats.#{index}").to_s
+      rescue I18n::Errors::MissingTranslation
+        nil
       end
 
       private def format_iso(y : Int32, m : Int32, d : Int32) : String
         "#{y}-#{sprintf("%02d", m)}-#{sprintf("%02d", d)}"
+      end
+
+      private def i18n_date_input_formats : Array(String)
+        fmts = [] of String
+        idx = 0
+
+        while fmt = fetch_localized_date_format(idx)
+          fmts << fmt
+          idx += 1
+        end
+
+        fmts
+      end
+
+      private def localized_weekday_names(monday_start : Bool) : Array(String)
+        keys = monday_start ? WEEKDAY_KEYS_MONDAY_START : WEEKDAY_KEYS_SUNDAY_START
+        keys.map { |key| I18n.t!("marten_calendar.calendar.weekday_names.#{key}") }
+      end
+
+      private def month_title(month : Int32) : String
+        key = MONTH_KEYS[month - 1]
+        I18n.t!("marten_calendar.calendar.month_names.#{key}")
+      end
+
+      private def next_month_tuple(y : Int32, m : Int32) : {Int32, Int32}
+        m == 12 ? {y + 1, 1} : {y, m + 1}
+      end
+
+      private def normalize_year_month(y : Int32, m : Int32) : {Int32, Int32}
+        q, r = (m - 1).divmod(12)
+        {y + q, r + 1}
+      end
+
+      private def parse_iso_date(s : String) : Time?
+        return nil unless s.size >= 10
+        y = s[0, 4].to_i?; m = s[5, 2].to_i?; d = s[8, 2].to_i?
+        return nil if y.nil? || m.nil? || d.nil?
+        Time.utc(y, m, d) rescue nil
+      end
+
+      private def parse_localized_date(s : String) : Time?
+        tz = Marten.settings.time_zone || Time::Location.load("UTC")
+
+        if t = try_parse(s, "%F", tz)
+          return t
+        end
+
+        fmts = i18n_date_input_formats + DEFAULT_DATE_INPUT_FORMATS
+        fmts.each do |fmt|
+          if t = try_parse(s, fmt, tz)
+            return t
+          end
+        end
+
+        nil
+      end
+
+      private def parse_week_start(s : String?) : Bool
+        case s.try &.downcase
+        when "sunday"      then false
+        when "monday", nil then true
+        else                    true
+        end
+      end
+
+      private def prev_month_tuple(y : Int32, m : Int32) : {Int32, Int32}
+        m == 1 ? {y - 1, 12} : {y, m - 1}
+      end
+
+      private def resolve_bool(ctx, key, fallback : Bool) : Bool
+        raw = @kwargs[key]?.try(&.resolve(ctx))
+        return fallback if raw.nil?
+        case raw
+        when Bool then raw
+        else
+          s = raw.to_s.downcase
+          {"1", "true", "t", "yes", "y", "on"}.includes?(s)
+        end
+      end
+
+      private def resolve_date(ctx, key) : Time?
+        val = @kwargs[key]?.try(&.resolve(ctx))
+        return unless val
+
+        case val
+        when Time
+          Time.utc(val.year, val.month, val.day)
+        when Marten::Template::Value
+          v = val.raw
+          return v if v.is_a?(Time)
+          parse_localized_date(v.to_s)
+        else
+          parse_iso_date(val.to_s)
+        end
+      end
+
+      private def resolve_int(ctx, key) : Int32?
+        @kwargs[key]?.try { |f| f.resolve(ctx).to_s.to_i? }
+      end
+
+      private def resolve_str(ctx, key) : String?
+        @kwargs[key]?.try { |f| f.resolve(ctx).to_s }
+      end
+
+      private def same_day?(a : Time, b : Time) : Bool
+        au = a.to_utc; bu = b.to_utc
+        au.year == bu.year && au.month == bu.month && au.day == bu.day
+      end
+
+      private def selected?(date : Time, default : Time?, disabled_flag : Bool) : Bool
+        return false unless default
+        return false if disabled_flag
+        same_day?(date, default.not_nil!)
+      end
+
+      private def today_utc : Time
+        Time.local.to_utc
+      end
+
+      private def try_parse(s : String, fmt : String, tz : Time::Location) : Time?
+        Time.parse(s, fmt, tz)
+      rescue
+        nil
       end
 
       MONTH_KEYS = %w(
