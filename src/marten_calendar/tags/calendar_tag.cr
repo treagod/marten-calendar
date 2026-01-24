@@ -308,6 +308,19 @@ module MartenCalendar
         {y + q, r + 1}
       end
 
+      private def parse_date_input(value) : Time?
+        case value
+        when Time
+          Time.utc(value.year, value.month, value.day)
+        when String
+          parse_string_date(value)
+        when Marten::Template::Value
+          parse_date_input(value.raw)
+        else
+          nil
+        end
+      end
+
       private def parse_iso_date(s : String) : Time?
         return nil unless s.size >= 10
         y = s[0, 4].to_i?; m = s[5, 2].to_i?; d = s[8, 2].to_i?
@@ -318,10 +331,6 @@ module MartenCalendar
       private def parse_localized_date(s : String) : Time?
         tz = Marten.settings.time_zone || Time::Location.load("UTC")
 
-        if t = try_parse(s, "%F", tz)
-          return t
-        end
-
         fmts = i18n_date_input_formats + DEFAULT_DATE_INPUT_FORMATS
         fmts.each do |fmt|
           if t = try_parse(s, fmt, tz)
@@ -330,6 +339,10 @@ module MartenCalendar
         end
 
         nil
+      end
+
+      private def parse_string_date(value : String) : Time?
+        parse_iso_date(value) || parse_localized_date(value)
       end
 
       private def parse_week_start(s : String?) : Bool
@@ -344,6 +357,20 @@ module MartenCalendar
         m == 1 ? {y - 1, 12} : {y, m - 1}
       end
 
+      private def raise_invalid_date!(key : String, raw_value) : NoReturn
+        shown =
+          case raw_value
+          when Marten::Template::Value
+            raw_value.raw.inspect
+          else
+            raw_value.inspect
+          end
+
+        raise Marten::Template::Errors::UnsupportedValue.new(
+          "Invalid #{key} date provided to calendar tag (#{shown})"
+        )
+      end
+
       private def resolve_bool(ctx, key, fallback : Bool) : Bool
         raw = @kwargs[key]?.try(&.resolve(ctx))
         return fallback if raw.nil?
@@ -356,19 +383,10 @@ module MartenCalendar
       end
 
       private def resolve_date(ctx, key) : Time?
-        val = @kwargs[key]?.try(&.resolve(ctx))
-        return unless val
+        value = @kwargs[key]?.try(&.resolve(ctx))
+        return unless value
 
-        case val
-        when Time
-          Time.utc(val.year, val.month, val.day)
-        when Marten::Template::Value
-          v = val.raw
-          return v if v.is_a?(Time)
-          parse_localized_date(v.to_s)
-        else
-          parse_iso_date(val.to_s)
-        end
+        parse_date_input(value) || raise_invalid_date!(key, value)
       end
 
       private def resolve_int(ctx, key) : Int32?
@@ -437,6 +455,8 @@ module MartenCalendar
 
       DEFAULT_DATE_INPUT_FORMATS = [
         "%Y-%m-%d",
+        "%d.%m.%Y",
+        "%d.%m.%y",
         "%m/%d/%Y",
         "%m/%d/%y",
         "%b %d %Y",

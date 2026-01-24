@@ -107,6 +107,14 @@ describe MartenCalendar do
       end
     end
 
+    it "raises when date kwargs cannot be parsed" do
+      with_calendar_templates do
+        expect_raises(Marten::Template::Errors::UnsupportedValue) do
+          render_calendar_tag("{% calendar min: 'not-a-date' %}")
+        end
+      end
+    end
+
     it "allows overriding templates via tag kwargs" do
       with_calendar_templates do
         source = String.build do |str|
