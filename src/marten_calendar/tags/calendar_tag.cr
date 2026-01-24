@@ -99,83 +99,25 @@ module MartenCalendar
         tmpl_path = resolve_str(context, "template") || Marten.settings.calendar.template_path
         cell_tmpl_path = resolve_str(context, "cell_template") || Marten.settings.calendar.cell_template_path
 
-        first_day = Time.utc(year, month, 1)
-        days_in_month = Time.days_in_month(year, month)
-        first_weekday = monday_start ? (first_day.day_of_week.value - 1) : (first_day.day_of_week.value % 7)
         weekday_names = localized_weekday_names(monday_start)
-
         prev_y, prev_m = prev_month_tuple(year, month)
         next_y, next_m = next_month_tuple(year, month)
-        prev_dim = Time.days_in_month(prev_y, prev_m)
         today = today_utc
 
-        calendar_cells = if fill_adjacent && first_weekday > 0
-                           start_d = prev_dim - first_weekday + 1
-                           cells = Array(CalendarCell).new
-                           start_d.upto(prev_dim) do |d|
-                             date = Time.utc(prev_y, prev_m, d)
-                             iso = format_iso(prev_y, prev_m, d)
-                             today_flag = same_day?(date, today)
-                             disabled_flag = disabled?(date, min_date, max_date)
-                             selected_flag = selected?(date, default_date, disabled_flag)
-                             cells << CalendarCell.new(
-                               d,
-                               iso,
-                               today: today_flag,
-                               disabled: disabled_flag,
-                               selected: selected_flag,
-                               adjacent_prev_month: true
-                             )
-                           end
-                           cells
-                         else
-                           Array(CalendarCell).new(first_weekday) do |_idx|
-                             CalendarCell.new(nil, nil)
-                           end
-                         end
-
-        day = 1
-        while day <= days_in_month
-          date = Time.utc(year, month, day)
-          iso = format_iso(year, month, day)
-          today_flag = same_day?(date, today)
-          disabled_flag = disabled?(date, min_date, max_date)
-          selected_flag = selected?(date, default_date, disabled_flag)
-          calendar_cells << CalendarCell.new(
-            day,
-            iso,
-            today: today_flag,
-            disabled: disabled_flag,
-            selected: selected_flag
-          )
-
-          day += 1
-        end
-
-        trailing = (7 - ((first_weekday + days_in_month) % 7)) % 7
-        if fill_adjacent && trailing > 0
-          1.upto(trailing) do |d|
-            date = Time.utc(next_y, next_m, d)
-            iso = format_iso(next_y, next_m, d)
-            today_flag = same_day?(date, today)
-            disabled_flag = disabled?(date, min_date, max_date)
-            selected_flag = selected?(date, default_date, disabled_flag)
-            calendar_cells << CalendarCell.new(
-              d,
-              iso,
-              today: today_flag,
-              disabled: disabled_flag,
-              selected: selected_flag,
-              adjacent_next_month: true
-            )
-          end
-        else
-          trailing.times do
-            calendar_cells << CalendarCell.new(nil, nil)
-          end
-        end
-
-        calendar_weeks = calendar_cells.in_slices_of(7)
+        calendar_weeks = build_calendar_cells(
+          year,
+          month,
+          monday_start,
+          fill_adjacent,
+          min_date,
+          max_date,
+          default_date,
+          prev_y,
+          prev_m,
+          next_y,
+          next_m,
+          today
+        )
         month_calendar = MonthCalendar.new(
           month,
           month_title(month),
@@ -202,6 +144,108 @@ module MartenCalendar
           "next_path"          => next_path,
           "previous_path"      => previous_path,
         })
+      end
+
+      private def build_calendar_cell(
+        date : Time,
+        day : Int32,
+        today : Time,
+        min_date : Time?,
+        max_date : Time?,
+        default_date : Time?,
+        *,
+        adjacent_prev_month : Bool = false,
+        adjacent_next_month : Bool = false,
+      ) : CalendarCell
+        today_flag = same_day?(date, today)
+        disabled_flag = disabled?(date, min_date, max_date)
+        selected_flag = selected?(date, default_date, disabled_flag)
+
+        CalendarCell.new(
+          day,
+          format_iso(date.year, date.month, day),
+          today: today_flag,
+          disabled: disabled_flag,
+          selected: selected_flag,
+          adjacent_prev_month: adjacent_prev_month,
+          adjacent_next_month: adjacent_next_month
+        )
+      end
+
+      private def build_calendar_cells(
+        year : Int32,
+        month : Int32,
+        monday_start : Bool,
+        fill_adjacent : Bool,
+        min_date : Time?,
+        max_date : Time?,
+        default_date : Time?,
+        prev_year : Int32,
+        prev_month : Int32,
+        next_year : Int32,
+        next_month : Int32,
+        today : Time,
+      ) : Array(Array(CalendarCell))
+        first_day = Time.utc(year, month, 1)
+        days_in_month = Time.days_in_month(year, month)
+        first_weekday = monday_start ? (first_day.day_of_week.value - 1) : (first_day.day_of_week.value % 7)
+        prev_dim = Time.days_in_month(prev_year, prev_month)
+
+        calendar_cells = Array(CalendarCell).new
+
+        if fill_adjacent && first_weekday > 0
+          start_d = prev_dim - first_weekday + 1
+          start_d.upto(prev_dim) do |d|
+            date = Time.utc(prev_year, prev_month, d)
+            calendar_cells << build_calendar_cell(
+              date,
+              d,
+              today,
+              min_date,
+              max_date,
+              default_date,
+              adjacent_prev_month: true
+            )
+          end
+        else
+          first_weekday.times do
+            calendar_cells << CalendarCell.new(nil, nil)
+          end
+        end
+
+        1.upto(days_in_month) do |d|
+          date = Time.utc(year, month, d)
+          calendar_cells << build_calendar_cell(
+            date,
+            d,
+            today,
+            min_date,
+            max_date,
+            default_date
+          )
+        end
+
+        trailing = (7 - ((first_weekday + days_in_month) % 7)) % 7
+        if fill_adjacent && trailing > 0
+          1.upto(trailing) do |d|
+            date = Time.utc(next_year, next_month, d)
+            calendar_cells << build_calendar_cell(
+              date,
+              d,
+              today,
+              min_date,
+              max_date,
+              default_date,
+              adjacent_next_month: true
+            )
+          end
+        else
+          trailing.times do
+            calendar_cells << CalendarCell.new(nil, nil)
+          end
+        end
+
+        calendar_cells.in_slices_of(7)
       end
 
       private def build_month_year_uri(
