@@ -61,7 +61,11 @@ module MartenCalendar
 
         private def resolve_date(key) : Time?
           value = @kwargs[key]?.try(&.resolve(@context))
-          return unless value
+          return if value.nil?
+
+          if value.is_a?(Marten::Template::Value) && value.raw.nil?
+            return nil
+          end
 
           parse_date_input(value) || raise_invalid_date!(key, value)
         end

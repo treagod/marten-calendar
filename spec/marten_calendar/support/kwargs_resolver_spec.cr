@@ -77,5 +77,17 @@ describe MartenCalendar::Tags::Support::KwargsResolver do
         I18n.locale = :en
       end
     end
+
+    it "ignores nil values coming from the template context" do
+      context = Marten::Template::Context.from({"maybe_max" => nil})
+      kwargs = {
+        "max" => Marten::Template::FilterExpression.new("maybe_max"),
+      } of String => Marten::Template::FilterExpression
+
+      resolver = MartenCalendar::Tags::Support::KwargsResolver.new(kwargs, context)
+      config = resolver.resolve
+
+      config.max_date.should be_nil
+    end
   end
 end
