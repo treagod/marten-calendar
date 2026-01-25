@@ -1,4 +1,5 @@
 require "uri"
+require "./support/**"
 
 module MartenCalendar
   module Tags
@@ -7,76 +8,11 @@ module MartenCalendar
 
       @kwargs = {} of String => Marten::Template::FilterExpression
 
-      struct CalendarCell
-        include Marten::Template::Object::Auto
-
-        getter day : Int32?
-        getter iso : String?
-
-        getter? today : Bool
-        getter? disabled : Bool
-        getter? selected : Bool
-        getter? adjacent_prev_month : Bool
-        getter? adjacent_next_month : Bool
-
-        @today : Bool
-        @disabled : Bool
-        @selected : Bool
-        @adjacent_prev_month : Bool
-        @adjacent_next_month : Bool
-
-        def initialize(
-          @day : Int32?,
-          @iso : String?,
-          *,
-          today : Bool = false,
-          disabled : Bool = false,
-          selected : Bool = false,
-          adjacent_prev_month : Bool = false,
-          adjacent_next_month : Bool = false,
-        )
-          @today = today
-          @disabled = disabled
-          @selected = selected
-          @adjacent_prev_month = adjacent_prev_month
-          @adjacent_next_month = adjacent_next_month
-        end
-
-        def blank? : Bool
-          @day.nil?
-        end
-
-        def has_classes? : Bool
-          today? || disabled? || selected? || adjacent_prev_month? || adjacent_next_month? || blank?
-        end
-      end
-
-      struct MonthCalendar
-        include Marten::Template::Object::Auto
-
-        getter month : Int32
-        getter month_title : String
-        getter year : Int32
-        getter weekday_names : Array(String)
-        getter calendar_cells : Array(Array(CalendarCell))
-        getter prev_year : Int32
-        getter prev_month : Int32
-        getter next_year : Int32
-        getter next_month : Int32
-
-        def initialize(
-          @month : Int32,
-          @month_title : String,
-          @year : Int32,
-          @weekday_names : Array(String),
-          @calendar_cells : Array(Array(CalendarCell)),
-          @prev_year : Int32,
-          @prev_month : Int32,
-          @next_year : Int32,
-          @next_month : Int32,
-        )
-        end
-      end
+      alias CalendarCell = Support::CalendarCell
+      alias MonthCalendar = Support::MonthCalendar
+      alias CalendarConfig = Support::CalendarConfig
+      alias KwargsResolver = Support::KwargsResolver
+      alias MonthCalendarBuilder = Support::MonthCalendarBuilder
 
       def initialize(parser : Marten::Template::Parser, source : String)
         extract_kwargs(source).each do |key, value|
@@ -85,182 +21,29 @@ module MartenCalendar
       end
 
       def render(context : Marten::Template::Context) : String
-        year_in = resolve_int(context, "year") || Time.local.year
-        month_in = resolve_int(context, "month") || Time.local.month
-        year, month = normalize_year_month(year_in, month_in)
+        config = KwargsResolver.new(@kwargs, context).resolve
 
-        monday_start = parse_week_start(resolve_str(context, "week_start"))
-        fill_adjacent = resolve_bool(context, "fill_adjacent", false)
-
-        min_date = resolve_date(context, "min")
-        max_date = resolve_date(context, "max")
-        default_date = resolve_date(context, "default")
-
-        tmpl_path = resolve_str(context, "template") || Marten.settings.calendar.template_path
-        cell_tmpl_path = resolve_str(context, "cell_template") || Marten.settings.calendar.cell_template_path
-
-        weekday_names = localized_weekday_names(monday_start)
-        prev_y, prev_m = prev_month_tuple(year, month)
-        next_y, next_m = next_month_tuple(year, month)
-        today = today_utc
-
-        calendar_weeks = build_calendar_cells(
-          year,
-          month,
-          monday_start,
-          fill_adjacent,
-          min_date,
-          max_date,
-          default_date,
-          prev_y,
-          prev_m,
-          next_y,
-          next_m,
-          today
-        )
-        month_calendar = MonthCalendar.new(
-          month,
-          month_title(month),
-          year,
-          weekday_names,
-          calendar_weeks,
-          prev_y,
-          prev_m,
-          next_y,
-          next_m
-        )
+        builder = MonthCalendarBuilder.new(config, today_utc)
+        month_calendar = builder.build
 
         next_path, previous_path = build_nav_paths(
           context,
-          prev_year: prev_y,
-          prev_month: prev_m,
-          next_year: next_y,
-          next_month: next_m
+          prev_year: month_calendar.prev_year,
+          prev_month: month_calendar.prev_month,
+          next_year: month_calendar.next_year,
+          next_month: month_calendar.next_month
         )
 
-        Marten.templates.get_template(tmpl_path).render({
+        Marten.templates.get_template(config.template_path).render({
           "month_calendar"     => month_calendar,
-          "cell_template_path" => cell_tmpl_path,
+          "cell_template_path" => config.cell_template_path,
           "next_path"          => next_path,
           "previous_path"      => previous_path,
         })
       end
 
-      private def build_calendar_cell(
-        date : Time,
-        day : Int32,
-        today : Time,
-        min_date : Time?,
-        max_date : Time?,
-        default_date : Time?,
-        *,
-        adjacent_prev_month : Bool = false,
-        adjacent_next_month : Bool = false,
-      ) : CalendarCell
-        today_flag = same_day?(date, today)
-        disabled_flag = disabled?(date, min_date, max_date)
-        selected_flag = selected?(date, default_date, disabled_flag)
-
-        CalendarCell.new(
-          day,
-          format_iso(date.year, date.month, day),
-          today: today_flag,
-          disabled: disabled_flag,
-          selected: selected_flag,
-          adjacent_prev_month: adjacent_prev_month,
-          adjacent_next_month: adjacent_next_month
-        )
-      end
-
-      private def build_calendar_cells(
-        year : Int32,
-        month : Int32,
-        monday_start : Bool,
-        fill_adjacent : Bool,
-        min_date : Time?,
-        max_date : Time?,
-        default_date : Time?,
-        prev_year : Int32,
-        prev_month : Int32,
-        next_year : Int32,
-        next_month : Int32,
-        today : Time,
-      ) : Array(Array(CalendarCell))
-        first_day = Time.utc(year, month, 1)
-        days_in_month = Time.days_in_month(year, month)
-        first_weekday = monday_start ? (first_day.day_of_week.value - 1) : (first_day.day_of_week.value % 7)
-        prev_dim = Time.days_in_month(prev_year, prev_month)
-
-        calendar_cells = Array(CalendarCell).new
-
-        if fill_adjacent && first_weekday > 0
-          start_d = prev_dim - first_weekday + 1
-          start_d.upto(prev_dim) do |d|
-            date = Time.utc(prev_year, prev_month, d)
-            calendar_cells << build_calendar_cell(
-              date,
-              d,
-              today,
-              min_date,
-              max_date,
-              default_date,
-              adjacent_prev_month: true
-            )
-          end
-        else
-          first_weekday.times do
-            calendar_cells << CalendarCell.new(nil, nil)
-          end
-        end
-
-        1.upto(days_in_month) do |d|
-          date = Time.utc(year, month, d)
-          calendar_cells << build_calendar_cell(
-            date,
-            d,
-            today,
-            min_date,
-            max_date,
-            default_date
-          )
-        end
-
-        trailing = (7 - ((first_weekday + days_in_month) % 7)) % 7
-        if fill_adjacent && trailing > 0
-          1.upto(trailing) do |d|
-            date = Time.utc(next_year, next_month, d)
-            calendar_cells << build_calendar_cell(
-              date,
-              d,
-              today,
-              min_date,
-              max_date,
-              default_date,
-              adjacent_next_month: true
-            )
-          end
-        else
-          trailing.times do
-            calendar_cells << CalendarCell.new(nil, nil)
-          end
-        end
-
-        calendar_cells.in_slices_of(7)
-      end
-
-      private def build_month_year_uri(
-        base_uri : URI,
-        base_params : URI::Params,
-        year : Int32,
-        month : Int32,
-      ) : String
-        params = base_params.dup
-        params["year"] = year.to_s
-        params["month"] = month.to_s
-
-        nav_uri = base_uri.dup
-        nav_uri.query = params.to_s
-        nav_uri.to_s
+      private def today_utc : Time
+        Time.local.to_utc
       end
 
       private def build_nav_paths(
@@ -290,19 +73,6 @@ module MartenCalendar
         {next_uri, prev_uri}
       end
 
-      private def date_gt?(a : Time, b : Time) : Bool
-        {a.year, a.month, a.day} > {b.year, b.month, b.day}
-      end
-
-      private def date_lt?(a : Time, b : Time) : Bool
-        {a.year, a.month, a.day} < {b.year, b.month, b.day}
-      end
-
-      private def disabled?(date : Time, min : Time?, max : Time?) : Bool
-        (!min.nil? && date_lt?(date, min.not_nil!)) ||
-          (!max.nil? && date_gt?(date, max.not_nil!))
-      end
-
       private def extract_query_params(uri : URI) : URI::Params
         if query = uri.query
           URI::Params.parse(query)
@@ -311,207 +81,20 @@ module MartenCalendar
         end
       end
 
-      private def fetch_localized_date_format(index : Int32) : String?
-        I18n.t!("marten.schema.field.date.input_formats.#{index}").to_s
-      rescue I18n::Errors::MissingTranslation
-        nil
+      private def build_month_year_uri(
+        base_uri : URI,
+        base_params : URI::Params,
+        year : Int32,
+        month : Int32,
+      ) : String
+        params = base_params.dup
+        params["year"] = year.to_s
+        params["month"] = month.to_s
+
+        nav_uri = base_uri.dup
+        nav_uri.query = params.to_s
+        nav_uri.to_s
       end
-
-      private def format_iso(y : Int32, m : Int32, d : Int32) : String
-        "#{y}-#{sprintf("%02d", m)}-#{sprintf("%02d", d)}"
-      end
-
-      private def i18n_date_input_formats : Array(String)
-        fmts = [] of String
-        idx = 0
-
-        while fmt = fetch_localized_date_format(idx)
-          fmts << fmt
-          idx += 1
-        end
-
-        fmts
-      end
-
-      private def localized_weekday_names(monday_start : Bool) : Array(String)
-        keys = monday_start ? WEEKDAY_KEYS_MONDAY_START : WEEKDAY_KEYS_SUNDAY_START
-        keys.map { |key| I18n.t!("marten_calendar.calendar.weekday_names.#{key}") }
-      end
-
-      private def month_title(month : Int32) : String
-        key = MONTH_KEYS[month - 1]
-        I18n.t!("marten_calendar.calendar.month_names.#{key}")
-      end
-
-      private def next_month_tuple(y : Int32, m : Int32) : {Int32, Int32}
-        m == 12 ? {y + 1, 1} : {y, m + 1}
-      end
-
-      private def normalize_year_month(y : Int32, m : Int32) : {Int32, Int32}
-        q, r = (m - 1).divmod(12)
-        {y + q, r + 1}
-      end
-
-      private def parse_date_input(value) : Time?
-        case value
-        when Time
-          Time.utc(value.year, value.month, value.day)
-        when String
-          parse_string_date(value)
-        when Marten::Template::Value
-          parse_date_input(value.raw)
-        else
-          nil
-        end
-      end
-
-      private def parse_iso_date(s : String) : Time?
-        return nil unless s.size >= 10
-        y = s[0, 4].to_i?; m = s[5, 2].to_i?; d = s[8, 2].to_i?
-        return nil if y.nil? || m.nil? || d.nil?
-        Time.utc(y, m, d) rescue nil
-      end
-
-      private def parse_localized_date(s : String) : Time?
-        tz = Marten.settings.time_zone || Time::Location.load("UTC")
-
-        fmts = i18n_date_input_formats + DEFAULT_DATE_INPUT_FORMATS
-        fmts.each do |fmt|
-          if t = try_parse(s, fmt, tz)
-            return t
-          end
-        end
-
-        nil
-      end
-
-      private def parse_string_date(value : String) : Time?
-        parse_iso_date(value) || parse_localized_date(value)
-      end
-
-      private def parse_week_start(s : String?) : Bool
-        case s.try &.downcase
-        when "sunday"      then false
-        when "monday", nil then true
-        else                    true
-        end
-      end
-
-      private def prev_month_tuple(y : Int32, m : Int32) : {Int32, Int32}
-        m == 1 ? {y - 1, 12} : {y, m - 1}
-      end
-
-      private def raise_invalid_date!(key : String, raw_value) : NoReturn
-        shown =
-          case raw_value
-          when Marten::Template::Value
-            raw_value.raw.inspect
-          else
-            raw_value.inspect
-          end
-
-        raise Marten::Template::Errors::UnsupportedValue.new(
-          "Invalid #{key} date provided to calendar tag (#{shown})"
-        )
-      end
-
-      private def resolve_bool(ctx, key, fallback : Bool) : Bool
-        raw = @kwargs[key]?.try(&.resolve(ctx))
-        return fallback if raw.nil?
-        case raw
-        when Bool then raw
-        else
-          s = raw.to_s.downcase
-          {"1", "true", "t", "yes", "y", "on"}.includes?(s)
-        end
-      end
-
-      private def resolve_date(ctx, key) : Time?
-        value = @kwargs[key]?.try(&.resolve(ctx))
-        return unless value
-
-        parse_date_input(value) || raise_invalid_date!(key, value)
-      end
-
-      private def resolve_int(ctx, key) : Int32?
-        @kwargs[key]?.try { |f| f.resolve(ctx).to_s.to_i? }
-      end
-
-      private def resolve_str(ctx, key) : String?
-        @kwargs[key]?.try { |f| f.resolve(ctx).to_s }
-      end
-
-      private def same_day?(a : Time, b : Time) : Bool
-        au = a.to_utc; bu = b.to_utc
-        au.year == bu.year && au.month == bu.month && au.day == bu.day
-      end
-
-      private def selected?(date : Time, default : Time?, disabled_flag : Bool) : Bool
-        return false unless default
-        return false if disabled_flag
-        same_day?(date, default.not_nil!)
-      end
-
-      private def today_utc : Time
-        Time.local.to_utc
-      end
-
-      private def try_parse(s : String, fmt : String, tz : Time::Location) : Time?
-        Time.parse(s, fmt, tz)
-      rescue
-        nil
-      end
-
-      MONTH_KEYS = %w(
-        january
-        february
-        march
-        april
-        may
-        june
-        july
-        august
-        september
-        october
-        november
-        december
-      )
-
-      WEEKDAY_KEYS_MONDAY_START = %w(
-        monday
-        tuesday
-        wednesday
-        thursday
-        friday
-        saturday
-        sunday
-      )
-
-      WEEKDAY_KEYS_SUNDAY_START = %w(
-        sunday
-        monday
-        tuesday
-        wednesday
-        thursday
-        friday
-        saturday
-      )
-
-      DEFAULT_DATE_INPUT_FORMATS = [
-        "%Y-%m-%d",
-        "%d.%m.%Y",
-        "%d.%m.%y",
-        "%m/%d/%Y",
-        "%m/%d/%y",
-        "%b %d %Y",
-        "%b %d, %Y",
-        "%d %b %Y",
-        "%d %b, %Y",
-        "%B %d %Y",
-        "%B %d, %Y",
-        "%d %B %Y",
-        "%d %B, %Y",
-      ]
     end
   end
 end
