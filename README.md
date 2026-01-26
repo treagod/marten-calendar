@@ -13,7 +13,7 @@ Marten Calendar is a Marten extension that provides the foundation for calendar-
 - [x] Current calendar rendering functionality
 - [x] Localized labels and weekday/month translations
 - [ ] Month calendar event support
-- [ ] Ready to use CSS Styling 
+- [ ] Ready to use CSS Styling
 
 ## Installation
 
@@ -67,8 +67,8 @@ Supported kwargs include:
 | `month` | String or Int | Current month | Optional month number (1-12). Provide with `year` to jump to a specific month. |
 | `week_start` | String | Monday | Set to `sunday` to render Sunday-first; any other value keeps Monday-first. |
 | `fill_adjacent` | `Bool` | `false` | When `true` pads the first and last rows with adjacent-month days instead of blanks. |
-| `min` | Time or String | `nil` | Smallest selectable day; accepts `Time` objects or ISO/localized strings. |
-| `max` | Time or String | `nil` | Largest selectable day; same parsing rules as `min`. |
+| `min` | Time or String | `nil` | Smallest selectable day; accepts `Time` objects or ISO/localized strings (or `nil` to disable the constraint). |
+| `max` | Time or String | `nil` | Largest selectable day; same parsing rules as `min` (or `nil` to disable). |
 | `default` | Time or String | `nil` | Initially selected day; leave unset for no selection. |
 | `template` | String | `Marten.settings.calendar.template_path` | Override the wrapper template path used for the whole calendar. |
 | `cell_template` | String | `Marten.settings.calendar.cell_template_path` | Override the per-day cell template path. |
