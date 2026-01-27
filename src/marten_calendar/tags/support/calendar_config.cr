@@ -4,8 +4,8 @@ module MartenCalendar
       struct CalendarConfig
         getter year : Int32
         getter month : Int32
-        getter monday_start : Bool
-        getter fill_adjacent : Bool
+        getter? monday_start : Bool
+        getter? fill_adjacent : Bool
         getter min_date : Time?
         getter max_date : Time?
         getter default_date : Time?

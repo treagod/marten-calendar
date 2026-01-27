@@ -4,7 +4,7 @@ module MartenCalendar
       class KwargsResolver
         def initialize(
           @kwargs : Hash(String, Marten::Template::FilterExpression),
-          @context : Marten::Template::Context
+          @context : Marten::Template::Context,
         )
         end
 

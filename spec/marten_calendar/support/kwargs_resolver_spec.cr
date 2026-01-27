@@ -13,8 +13,8 @@ describe MartenCalendar::Tags::Support::KwargsResolver do
 
         config.year.should eq 2024
         config.month.should eq 5
-        config.monday_start.should be_true
-        config.fill_adjacent.should be_false
+        config.monday_start?.should be_true
+        config.fill_adjacent?.should be_false
         config.template_path.should eq "marten_calendar/month_calendar.html"
         config.cell_template_path.should eq "marten_calendar/month_calendar_cell.html"
       end
@@ -39,8 +39,8 @@ describe MartenCalendar::Tags::Support::KwargsResolver do
 
       config.year.should eq 2026
       config.month.should eq 2
-      config.monday_start.should be_false
-      config.fill_adjacent.should be_true
+      config.monday_start?.should be_false
+      config.fill_adjacent?.should be_true
       config.min_date.should eq Time.utc(2026, 2, 10)
       config.max_date.should eq Time.utc(2026, 2, 20)
       config.default_date.should eq Time.utc(2026, 2, 15)

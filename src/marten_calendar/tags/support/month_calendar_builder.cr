@@ -4,7 +4,7 @@ module MartenCalendar
       class MonthCalendarBuilder
         def initialize(
           @config : CalendarConfig,
-          @today : Time
+          @today : Time,
         )
         end
 
@@ -12,12 +12,12 @@ module MartenCalendar
           prev_year, prev_month = prev_month_tuple(@config.year, @config.month)
           next_year, next_month = next_month_tuple(@config.year, @config.month)
 
-          weekday_names = localized_weekday_names(@config.monday_start)
+          weekday_names = localized_weekday_names(@config.monday_start?)
           calendar_weeks = build_calendar_cells(
             @config.year,
             @config.month,
-            @config.monday_start,
-            @config.fill_adjacent,
+            @config.monday_start?,
+            @config.fill_adjacent?,
             @config.min_date,
             @config.max_date,
             @config.default_date,
