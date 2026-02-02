@@ -6,7 +6,7 @@
 
 Marten Calendar is a Marten extension that provides the foundation for calendar- and scheduling-related features such as navigation between months, localized rendering, and (soon) event decoration. It is designed to get a production-ready month calendar on the screen quickly while still giving you hooks to extend templates or replace rendering logic entirely.
 
-> **Note**: This shard is currently being bootstrapped. Documentation, features, and usage examples will continue to evolve as the implementation is built out.
+> **Note**: This shard is currently in its early stages. Documentation, features, and usage examples will continue to evolve as the implementation is built out.
 
 ## Checklist
 
