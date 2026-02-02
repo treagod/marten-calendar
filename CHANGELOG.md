@@ -1,5 +1,5 @@
 # Changelog
 
-## 0.1.0 (xxxx-xx-xx)
+## 0.1.0 (2026-02-02)
 
 Initial release of MartenCalendar
