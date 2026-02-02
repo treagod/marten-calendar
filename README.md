@@ -13,7 +13,7 @@ Marten Calendar is a Marten extension that provides the foundation for calendar-
 - [x] Current calendar rendering functionality
 - [x] Localized labels and weekday/month translations
 - [ ] Month calendar event support
-- [ ] Ready to use CSS Styling
+- [x] Ready to use CSS Styling
 
 ## Installation
 
@@ -72,6 +72,14 @@ Supported kwargs include:
 | `default` | Time or String | `nil` | Initially selected day; leave unset for no selection. |
 | `template` | String | `Marten.settings.calendar.template_path` | Override the wrapper template path used for the whole calendar. |
 | `cell_template` | String | `Marten.settings.calendar.cell_template_path` | Override the per-day cell template path. |
+
+![Basic calendar screenshot](basic-calendar.png)
+
+The shard also ships with a ready-to-use stylesheet that you can load via your asset pipeline:
+
+```html
+<link rel="stylesheet" type="text/css" href="{% asset 'css/calendar/calendar.css' %}" />
+```
 
 ### Internationalization
 

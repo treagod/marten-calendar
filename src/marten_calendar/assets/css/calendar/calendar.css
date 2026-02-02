@@ -1,0 +1,156 @@
+.marten-calendar {
+    --mc-bg: #ffffff;
+    --mc-fg: #111827;
+    --mc-muted: #6b7280;
+    --mc-border: #e5e7eb;
+    --mc-soft: #f3f4f6;
+    --mc-hover: #f9fafb;
+    --mc-today-bg: #eef2ff;
+    --mc-today-ring: #c7d2fe;
+    --mc-disabled-fg: #9ca3af;
+    --mc-focus: 0 0 0 3px rgba(59, 130, 246, 0.35);
+
+    color-scheme: light dark;
+    color: var(--mc-fg);
+    background: var(--mc-bg);
+    border: 1px solid var(--mc-border);
+    border-radius: 12px;
+    padding: 12px;
+    max-width: 420px;
+}
+
+@media (prefers-color-scheme: dark) {
+    .marten-calendar {
+        --mc-bg: #0b1220;
+        --mc-fg: #e5e7eb;
+        --mc-muted: #9ca3af;
+        --mc-border: #1f2937;
+        --mc-soft: #111827;
+        --mc-hover: #0f172a;
+        --mc-today-bg: rgba(99, 102, 241, 0.18);
+        --mc-today-ring: rgba(99, 102, 241, 0.35);
+        --mc-disabled-fg: #6b7280;
+        --mc-focus: 0 0 0 3px rgba(147, 197, 253, 0.35);
+    }
+}
+
+.marten-calendar .calendar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.marten-calendar .calendar-title {
+    flex: 1;
+    text-align: center;
+    font-weight: 650;
+    letter-spacing: 0.2px;
+}
+
+.marten-calendar .nav-prev,
+.marten-calendar .nav-next {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 34px;
+    height: 34px;
+    padding: 0 10px;
+
+    color: inherit;
+    text-decoration: none;
+    border: 1px solid var(--mc-border);
+    border-radius: 10px;
+    background: var(--mc-soft);
+
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.marten-calendar .nav-prev:hover,
+.marten-calendar .nav-next:hover {
+    background: var(--mc-hover);
+}
+
+.marten-calendar .nav-prev:focus-visible,
+.marten-calendar .nav-next:focus-visible {
+    outline: none;
+    box-shadow: var(--mc-focus);
+}
+
+.marten-calendar .calendar-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.marten-calendar .calendar-table th {
+    padding: 8px 6px;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 650;
+    color: var(--mc-muted);
+    border-bottom: 1px solid var(--mc-border);
+}
+
+.marten-calendar .calendar-table td {
+    padding: 0;
+    border-bottom: 1px solid var(--mc-border);
+    border-right: 1px solid var(--mc-border);
+    height: 44px;
+    vertical-align: middle;
+    background: transparent;
+}
+
+.marten-calendar .calendar-table tr td:last-child {
+    border-right: none;
+}
+
+.marten-calendar .calendar-table td > time {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    height: 44px;
+}
+
+.marten-calendar .calendar-table td:hover:not(.blank):not(.disabled) {
+    background: var(--mc-hover);
+}
+
+.marten-calendar .calendar-table td:focus-within {
+    outline: none;
+    box-shadow: inset var(--mc-focus);
+}
+
+.marten-calendar .calendar-table td.blank {
+    background: transparent;
+    border-right: 1px solid transparent;
+    border-bottom: 1px solid var(--mc-border);
+}
+
+.marten-calendar .calendar-table td.disabled {
+    color: var(--mc-disabled-fg);
+    background: transparent;
+}
+
+.marten-calendar .calendar-table td.disabled > time {
+    opacity: 0.85;
+}
+
+.marten-calendar .calendar-table td.today,
+.marten-calendar .calendar-table td[aria-current="date"] {
+    background: var(--mc-today-bg);
+    box-shadow: inset 0 0 0 1px var(--mc-today-ring);
+}
+
+/* Optional: make whole component a bit tighter on small screens */
+@media (max-width: 360px) {
+    .marten-calendar {
+        padding: 10px;
+    }
+    .marten-calendar .calendar-table td,
+    .marten-calendar .calendar-table td > time {
+        height: 40px;
+    }
+}
