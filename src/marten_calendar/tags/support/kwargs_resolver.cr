@@ -18,6 +18,7 @@ module MartenCalendar
           min_date = resolve_date("min")
           max_date = resolve_date("max")
           default_date = resolve_date("default")
+          events = resolve_events("events")
 
           template_path = resolve_str("template") || Marten.settings.calendar.template_path
           cell_template_path = resolve_str("cell_template") || Marten.settings.calendar.cell_template_path
@@ -31,7 +32,8 @@ module MartenCalendar
             max_date,
             default_date,
             template_path,
-            cell_template_path
+            cell_template_path,
+            events
           )
         end
 
@@ -67,68 +69,29 @@ module MartenCalendar
             return nil
           end
 
-          parse_date_input(value) || raise_invalid_date!(key, value)
+          DateInputParser.parse(value) || raise_invalid_date!(key, value)
         end
 
-        private def parse_date_input(value) : Time?
-          case value
-          when Time
-            Time.utc(value.year, value.month, value.day)
-          when String
-            parse_string_date(value)
-          when Marten::Template::Value
-            parse_date_input(value.raw)
-          else
-            nil
-          end
-        end
+        private def resolve_events(key : String) : Array(Marten::Template::Value)
+          expression = @kwargs[key]?
+          return [] of Marten::Template::Value unless expression
 
-        private def parse_string_date(value : String) : Time?
-          parse_iso_date(value) || parse_localized_date(value)
-        end
+          value = expression.resolve(@context)
+          return [] of Marten::Template::Value if value.raw.nil?
 
-        private def parse_iso_date(s : String) : Time?
-          return nil unless s.size >= 10
-          y = s[0, 4].to_i?; m = s[5, 2].to_i?; d = s[8, 2].to_i?
-          return nil if y.nil? || m.nil? || d.nil?
-          Time.utc(y, m, d) rescue nil
-        end
+          events = [] of Marten::Template::Value
 
-        private def parse_localized_date(s : String) : Time?
-          tz = Marten.settings.time_zone || Time::Location.load("UTC")
-
-          fmts = i18n_date_input_formats + DEFAULT_DATE_INPUT_FORMATS
-          fmts.each do |fmt|
-            if t = try_parse(s, fmt, tz)
-              return t
+          begin
+            value.each do |event|
+              events << event
             end
+          rescue Marten::Template::Errors::UnsupportedType
+            raise Marten::Template::Errors::UnsupportedValue.new(
+              "Invalid #{key} value provided to calendar tag (expected iterable, got #{value.raw.class})"
+            )
           end
 
-          nil
-        end
-
-        private def i18n_date_input_formats : Array(String)
-          fmts = [] of String
-          idx = 0
-
-          while fmt = fetch_localized_date_format(idx)
-            fmts << fmt
-            idx += 1
-          end
-
-          fmts
-        end
-
-        private def fetch_localized_date_format(index : Int32) : String?
-          I18n.t!("marten.schema.field.date.input_formats.#{index}").to_s
-        rescue I18n::Errors::MissingTranslation
-          nil
-        end
-
-        private def try_parse(s : String, fmt : String, tz : Time::Location) : Time?
-          Time.parse(s, fmt, tz)
-        rescue
-          nil
+          events
         end
 
         private def parse_week_start(s : String?) : Bool
@@ -153,22 +116,6 @@ module MartenCalendar
           )
         end
       end
-
-      DEFAULT_DATE_INPUT_FORMATS = [
-        "%Y-%m-%d",
-        "%d.%m.%Y",
-        "%d.%m.%y",
-        "%m/%d/%Y",
-        "%m/%d/%y",
-        "%b %d %Y",
-        "%b %d, %Y",
-        "%d %b %Y",
-        "%d %b, %Y",
-        "%B %d %Y",
-        "%B %d, %Y",
-        "%d %B %Y",
-        "%d %B, %Y",
-      ]
     end
   end
 end

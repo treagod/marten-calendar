@@ -17,6 +17,7 @@ describe MartenCalendar::Tags::Support::KwargsResolver do
         config.fill_adjacent?.should be_false
         config.template_path.should eq "marten_calendar/month_calendar.html"
         config.cell_template_path.should eq "marten_calendar/month_calendar_cell.html"
+        config.events.should be_empty
       end
     end
 
@@ -48,6 +49,18 @@ describe MartenCalendar::Tags::Support::KwargsResolver do
       config.cell_template_path.should eq "custom/cell.html"
     end
 
+    it "accepts date-time strings by parsing their ISO date prefix" do
+      context = Marten::Template::Context.from({} of String => Int32)
+      kwargs = {
+        "min" => Marten::Template::FilterExpression.new("'2026-02-10T23:59:59Z'"),
+      } of String => Marten::Template::FilterExpression
+
+      resolver = MartenCalendar::Tags::Support::KwargsResolver.new(kwargs, context)
+      config = resolver.resolve
+
+      config.min_date.should eq Time.utc(2026, 2, 10)
+    end
+
     it "raises when date inputs cannot be parsed" do
       context = Marten::Template::Context.from({} of String => Int32)
       kwargs = {
@@ -61,20 +74,63 @@ describe MartenCalendar::Tags::Support::KwargsResolver do
       end
     end
 
-    it "honors localized input formats from I18n" do
+    it "honors input formats from Marten settings" do
       context = Marten::Template::Context.from({} of String => Int32)
       kwargs = {
         "min" => Marten::Template::FilterExpression.new("'20.11.2025'"),
       } of String => Marten::Template::FilterExpression
 
-      I18n.locale = :de
+      snapshot = Marten.settings.date_input_formats.dup
       begin
+        Marten.settings.date_input_formats = snapshot + ["%d.%m.%Y"]
+
         resolver = MartenCalendar::Tags::Support::KwargsResolver.new(kwargs, context)
         config = resolver.resolve
 
         config.min_date.should eq Time.utc(2025, 11, 20)
       ensure
-        I18n.locale = :en
+        Marten.settings.date_input_formats = snapshot
+      end
+    end
+
+    it "honors localized date input formats before settings fallbacks" do
+      context = Marten::Template::Context.from({} of String => Int32)
+      kwargs = {
+        "min" => Marten::Template::FilterExpression.new("'11/20/2025'"),
+      } of String => Marten::Template::FilterExpression
+
+      snapshot = Marten.settings.date_input_formats.dup
+      begin
+        Marten.settings.date_input_formats = ["%d.%m.%Y"]
+
+        resolver = MartenCalendar::Tags::Support::KwargsResolver.new(kwargs, context)
+        config = resolver.resolve
+
+        config.min_date.should eq Time.utc(2025, 11, 20)
+      ensure
+        Marten.settings.date_input_formats = snapshot
+      end
+    end
+
+    it "normalizes localized parsed dates to UTC day boundaries" do
+      context = Marten::Template::Context.from({} of String => Int32)
+      kwargs = {
+        "default" => Marten::Template::FilterExpression.new("'11/20/2025'"),
+      } of String => Marten::Template::FilterExpression
+
+      formats_snapshot = Marten.settings.date_input_formats.dup
+      timezone_snapshot = Marten.settings.time_zone
+      begin
+        Marten.settings.time_zone = Time::Location.load("Europe/Berlin")
+        Marten.settings.date_input_formats = ["%d.%m.%Y"] # ensure localized format is used
+
+        resolver = MartenCalendar::Tags::Support::KwargsResolver.new(kwargs, context)
+        config = resolver.resolve
+
+        config.default_date.should eq Time.utc(2025, 11, 20)
+      ensure
+        Marten.settings.date_input_formats = formats_snapshot
+        Marten.settings.time_zone = timezone_snapshot
       end
     end
 
@@ -88,6 +144,33 @@ describe MartenCalendar::Tags::Support::KwargsResolver do
       config = resolver.resolve
 
       config.max_date.should be_nil
+    end
+
+    it "resolves events from iterable context values" do
+      context = Marten::Template::Context.from({
+        "meetings" => ["Planning", "Demo"],
+      })
+      kwargs = {
+        "events" => Marten::Template::FilterExpression.new("meetings"),
+      } of String => Marten::Template::FilterExpression
+
+      resolver = MartenCalendar::Tags::Support::KwargsResolver.new(kwargs, context)
+      config = resolver.resolve
+
+      config.events.map(&.raw).should eq(["Planning", "Demo"])
+    end
+
+    it "raises when events kwarg is not iterable" do
+      context = Marten::Template::Context.from({"meetings" => 42})
+      kwargs = {
+        "events" => Marten::Template::FilterExpression.new("meetings"),
+      } of String => Marten::Template::FilterExpression
+
+      resolver = MartenCalendar::Tags::Support::KwargsResolver.new(kwargs, context)
+
+      expect_raises(Marten::Template::Errors::UnsupportedValue) do
+        resolver.resolve
+      end
     end
   end
 end

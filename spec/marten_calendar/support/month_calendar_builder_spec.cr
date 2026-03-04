@@ -96,4 +96,198 @@ describe MartenCalendar::Tags::Support::MonthCalendarBuilder do
     selected_cells = calendar.calendar_cells.flatten.select(&.selected?)
     selected_cells.should be_empty
   end
+
+  it "attaches single-day events to matching dates only" do
+    event = CalendarSpecEvent.new("Planning", Time.utc(2024, 2, 15))
+    config = MartenCalendar::Tags::Support::CalendarConfig.new(
+      2024,
+      2,
+      true,
+      true,
+      nil,
+      nil,
+      nil,
+      "marten_calendar/month_calendar.html",
+      "marten_calendar/month_calendar_cell.html",
+      [Marten::Template::Value.from(event)]
+    )
+
+    calendar = MartenCalendar::Tags::Support::MonthCalendarBuilder.new(
+      config,
+      Time.utc(2024, 2, 1)
+    ).build
+
+    cell_for_iso(calendar, "2024-02-14").events.should be_empty
+    cell_for_iso(calendar, "2024-02-15").events.size.should eq 1
+    cell_for_iso(calendar, "2024-02-16").events.should be_empty
+  end
+
+  it "maps multi-day events across the full inclusive span" do
+    event = CalendarSpecEvent.new(
+      "Conference",
+      Time.utc(2024, 2, 10),
+      Time.utc(2024, 2, 12)
+    )
+    config = MartenCalendar::Tags::Support::CalendarConfig.new(
+      2024,
+      2,
+      true,
+      true,
+      nil,
+      nil,
+      nil,
+      "marten_calendar/month_calendar.html",
+      "marten_calendar/month_calendar_cell.html",
+      [Marten::Template::Value.from(event)]
+    )
+
+    calendar = MartenCalendar::Tags::Support::MonthCalendarBuilder.new(
+      config,
+      Time.utc(2024, 2, 1)
+    ).build
+
+    cell_for_iso(calendar, "2024-02-10").events.size.should eq 1
+    cell_for_iso(calendar, "2024-02-11").events.size.should eq 1
+    cell_for_iso(calendar, "2024-02-12").events.size.should eq 1
+    cell_for_iso(calendar, "2024-02-13").events.should be_empty
+  end
+
+  it "clips multi-day events to the visible date range" do
+    event = CalendarSpecEvent.new(
+      "Long trip",
+      Time.utc(2024, 1, 28),
+      Time.utc(2024, 3, 3)
+    )
+    config = MartenCalendar::Tags::Support::CalendarConfig.new(
+      2024,
+      2,
+      true,
+      false,
+      nil,
+      nil,
+      nil,
+      "marten_calendar/month_calendar.html",
+      "marten_calendar/month_calendar_cell.html",
+      [Marten::Template::Value.from(event)]
+    )
+
+    calendar = MartenCalendar::Tags::Support::MonthCalendarBuilder.new(
+      config,
+      Time.utc(2024, 2, 1)
+    ).build
+
+    cell_for_iso(calendar, "2024-02-01").events.size.should eq 1
+    cell_for_iso(calendar, "2024-02-29").events.size.should eq 1
+    calendar.calendar_cells.flatten.select(&.blank?).all?(&.events.empty?).should be_true
+  end
+
+  it "raises when an event does not expose start_time" do
+    config = MartenCalendar::Tags::Support::CalendarConfig.new(
+      2024,
+      2,
+      true,
+      true,
+      nil,
+      nil,
+      nil,
+      "marten_calendar/month_calendar.html",
+      "marten_calendar/month_calendar_cell.html",
+      [Marten::Template::Value.from(CalendarSpecEventWithoutStartTime.new("Broken"))]
+    )
+
+    builder = MartenCalendar::Tags::Support::MonthCalendarBuilder.new(
+      config,
+      Time.utc(2024, 2, 1)
+    )
+
+    expect_raises(Marten::Template::Errors::UnsupportedValue) do
+      builder.build
+    end
+  end
+
+  it "raises when start_time cannot be parsed" do
+    event = CalendarSpecEvent.new("Broken", "not-a-date")
+    config = MartenCalendar::Tags::Support::CalendarConfig.new(
+      2024,
+      2,
+      true,
+      true,
+      nil,
+      nil,
+      nil,
+      "marten_calendar/month_calendar.html",
+      "marten_calendar/month_calendar_cell.html",
+      [Marten::Template::Value.from(event)]
+    )
+
+    builder = MartenCalendar::Tags::Support::MonthCalendarBuilder.new(
+      config,
+      Time.utc(2024, 2, 1)
+    )
+
+    expect_raises(Marten::Template::Errors::UnsupportedValue) do
+      builder.build
+    end
+  end
+
+  it "raises when end_time cannot be parsed" do
+    event = CalendarSpecEvent.new("Broken", Time.utc(2024, 2, 10), "not-a-date")
+    config = MartenCalendar::Tags::Support::CalendarConfig.new(
+      2024,
+      2,
+      true,
+      true,
+      nil,
+      nil,
+      nil,
+      "marten_calendar/month_calendar.html",
+      "marten_calendar/month_calendar_cell.html",
+      [Marten::Template::Value.from(event)]
+    )
+
+    builder = MartenCalendar::Tags::Support::MonthCalendarBuilder.new(
+      config,
+      Time.utc(2024, 2, 1)
+    )
+
+    expect_raises(Marten::Template::Errors::UnsupportedValue) do
+      builder.build
+    end
+  end
+
+  it "raises when end_time is before start_time" do
+    event = CalendarSpecEvent.new(
+      "Broken range",
+      Time.utc(2024, 2, 12),
+      Time.utc(2024, 2, 10)
+    )
+    config = MartenCalendar::Tags::Support::CalendarConfig.new(
+      2024,
+      2,
+      true,
+      true,
+      nil,
+      nil,
+      nil,
+      "marten_calendar/month_calendar.html",
+      "marten_calendar/month_calendar_cell.html",
+      [Marten::Template::Value.from(event)]
+    )
+
+    builder = MartenCalendar::Tags::Support::MonthCalendarBuilder.new(
+      config,
+      Time.utc(2024, 2, 1)
+    )
+
+    expect_raises(Marten::Template::Errors::UnsupportedValue) do
+      builder.build
+    end
+  end
+end
+
+private def cell_for_iso(
+  calendar : MartenCalendar::Tags::Support::MonthCalendar,
+  iso : String,
+) : MartenCalendar::Tags::Support::CalendarCell
+  calendar.calendar_cells.flatten.find { |cell| cell.iso == iso }.not_nil!
 end

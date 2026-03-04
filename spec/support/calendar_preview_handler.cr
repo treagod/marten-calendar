@@ -1,5 +1,5 @@
 class CalendarPreviewHandler < Marten::Handlers::Template
-  template_name "marten_calendar.html"
+  template_name "spec_calendar/preview/marten_calendar.html"
 
   before_render :set_calendar_context
 

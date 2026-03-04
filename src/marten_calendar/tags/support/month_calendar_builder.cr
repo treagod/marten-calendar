@@ -2,6 +2,9 @@ module MartenCalendar
   module Tags
     module Support
       class MonthCalendarBuilder
+        alias CalendarEvents = Array(Marten::Template::Value)
+        alias EventsByISO = Hash(String, CalendarEvents)
+
         def initialize(
           @config : CalendarConfig,
           @today : Time,
@@ -11,8 +14,15 @@ module MartenCalendar
         def build : MonthCalendar
           prev_year, prev_month = prev_month_tuple(@config.year, @config.month)
           next_year, next_month = next_month_tuple(@config.year, @config.month)
+          visible_start, visible_end = visible_date_range(
+            @config.year,
+            @config.month,
+            @config.monday_start?,
+            @config.fill_adjacent?
+          )
 
           weekday_names = localized_weekday_names(@config.monday_start?)
+          events_by_iso = build_events_index(@config.events, visible_start, visible_end)
           calendar_weeks = build_calendar_cells(
             @config.year,
             @config.month,
@@ -24,7 +34,8 @@ module MartenCalendar
             prev_year,
             prev_month,
             next_year,
-            next_month
+            next_month,
+            events_by_iso
           )
 
           MonthCalendar.new(
@@ -52,6 +63,7 @@ module MartenCalendar
           prev_month : Int32,
           next_year : Int32,
           next_month : Int32,
+          events_by_iso : EventsByISO,
         ) : Array(Array(CalendarCell))
           first_day = Time.utc(year, month, 1)
           days_in_month = Time.days_in_month(year, month)
@@ -70,6 +82,7 @@ module MartenCalendar
                 min_date,
                 max_date,
                 default_date,
+                events_by_iso,
                 adjacent_prev_month: true
               )
             end
@@ -86,7 +99,8 @@ module MartenCalendar
               d,
               min_date,
               max_date,
-              default_date
+              default_date,
+              events_by_iso
             )
           end
 
@@ -100,6 +114,7 @@ module MartenCalendar
                 min_date,
                 max_date,
                 default_date,
+                events_by_iso,
                 adjacent_next_month: true
               )
             end
@@ -118,22 +133,118 @@ module MartenCalendar
           min_date : Time?,
           max_date : Time?,
           default_date : Time?,
+          events_by_iso : EventsByISO,
           *,
           adjacent_prev_month : Bool = false,
           adjacent_next_month : Bool = false,
         ) : CalendarCell
+          iso = format_iso(date.year, date.month, day)
           today_flag = same_day?(date, @today)
           disabled_flag = disabled?(date, min_date, max_date)
           selected_flag = selected?(date, default_date, disabled_flag)
+          events = events_by_iso[iso]? || [] of Marten::Template::Value
 
           CalendarCell.new(
             day,
-            format_iso(date.year, date.month, day),
+            iso,
+            events: events,
             today: today_flag,
             disabled: disabled_flag,
             selected: selected_flag,
             adjacent_prev_month: adjacent_prev_month,
             adjacent_next_month: adjacent_next_month
+          )
+        end
+
+        private def visible_date_range(
+          year : Int32,
+          month : Int32,
+          monday_start : Bool,
+          fill_adjacent : Bool,
+        ) : {Time, Time}
+          first_day = Time.utc(year, month, 1)
+          days_in_month = Time.days_in_month(year, month)
+          first_weekday = monday_start ? (first_day.day_of_week.value - 1) : (first_day.day_of_week.value % 7)
+          trailing = (7 - ((first_weekday + days_in_month) % 7)) % 7
+          last_day = Time.utc(year, month, days_in_month)
+
+          if fill_adjacent
+            {first_day - first_weekday.days, last_day + trailing.days}
+          else
+            {first_day, last_day}
+          end
+        end
+
+        private def build_events_index(
+          events : CalendarEvents,
+          visible_start : Time,
+          visible_end : Time,
+        ) : EventsByISO
+          events_by_iso = Hash(String, CalendarEvents).new { |hash, key| hash[key] = [] of Marten::Template::Value }
+
+          events.each do |event|
+            start_date = event_start_date(event)
+            end_date = event_end_date(event) || start_date
+
+            if date_lt?(end_date, start_date)
+              raise Marten::Template::Errors::UnsupportedValue.new(
+                "Calendar event #{event.raw.inspect} has an end_time before its start_time"
+              )
+            end
+
+            clipped_start = date_lt?(start_date, visible_start) ? visible_start : start_date
+            clipped_end = date_gt?(end_date, visible_end) ? visible_end : end_date
+            next if date_gt?(clipped_start, clipped_end)
+
+            cursor = clipped_start
+            loop do
+              events_by_iso[format_iso(cursor.year, cursor.month, cursor.day)] << event
+              break if same_day?(cursor, clipped_end)
+              cursor += 1.day
+            end
+          end
+
+          events_by_iso
+        end
+
+        private def event_start_date(event : Marten::Template::Value) : Time
+          value = fetch_event_attribute!(event, "start_time")
+          parse_event_date!(value, "start_time", event)
+        end
+
+        private def event_end_date(event : Marten::Template::Value) : Time?
+          value = fetch_event_attribute(event, "end_time")
+          return nil if value.nil?
+          return nil if value.not_nil!.raw.nil?
+
+          parse_event_date!(value.not_nil!, "end_time", event)
+        end
+
+        private def fetch_event_attribute(event : Marten::Template::Value, key : String) : Marten::Template::Value?
+          event[key]
+        rescue Marten::Template::Errors::UnknownVariable
+          nil
+        end
+
+        private def fetch_event_attribute!(event : Marten::Template::Value, key : String) : Marten::Template::Value
+          event[key]
+        rescue Marten::Template::Errors::UnknownVariable
+          raise Marten::Template::Errors::UnsupportedValue.new(
+            "Calendar event #{event.raw.inspect} must expose #{key}"
+          )
+        end
+
+        private def parse_event_date!(
+          value : Marten::Template::Value,
+          key : String,
+          event : Marten::Template::Value,
+        ) : Time
+          if parsed = DateInputParser.parse(value)
+            return parsed
+          end
+
+          raise Marten::Template::Errors::UnsupportedValue.new(
+            "Calendar event #{event.raw.inspect} has an invalid #{key} value (#{value.raw.inspect})"
           )
         end
 

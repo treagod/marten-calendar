@@ -1,0 +1,8 @@
+{% if calendar_cell.blank? %}
+<span class="event-cell blank">-</span>
+{% else %}
+<span class="event-day" data-date="{{ calendar_cell.iso }}">{{ calendar_cell.day }}</span>
+{% for event in calendar_cell.events %}
+<span class="event-name">{{ event.name }}</span>
+{% endfor %}
+{% endif %}

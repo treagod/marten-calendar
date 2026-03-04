@@ -11,6 +11,7 @@ module MartenCalendar
         getter default_date : Time?
         getter template_path : String
         getter cell_template_path : String
+        getter events : Array(Marten::Template::Value)
 
         def initialize(
           @year : Int32,
@@ -22,6 +23,7 @@ module MartenCalendar
           @default_date : Time?,
           @template_path : String,
           @cell_template_path : String,
+          @events : Array(Marten::Template::Value) = [] of Marten::Template::Value,
         )
         end
       end

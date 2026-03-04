@@ -129,6 +129,34 @@ describe MartenCalendar do
       end
     end
 
+    it "exposes events to custom cell templates" do
+      with_calendar_templates do
+        meetings = [
+          CalendarSpecEvent.new("Planning", Time.utc(2024, 2, 15)),
+          CalendarSpecEvent.new("Conference", Time.utc(2024, 2, 20), Time.utc(2024, 2, 21)),
+        ]
+
+        source = String.build do |str|
+          str << "{% calendar year: calendar_year, month: calendar_month, fill_adjacent: true,"
+          str << " events: meetings,"
+          str << " template: 'spec_calendar/custom_month_calendar.html',"
+          str << " cell_template: 'spec_calendar/custom_events_calendar_cell.html' %}"
+        end
+
+        rendered = render_calendar_tag(
+          source,
+          {
+            "calendar_year"  => 2024,
+            "calendar_month" => 2,
+            "meetings"       => meetings,
+          }
+        )
+
+        rendered.should contain %(<span class="event-name">Planning</span>)
+        rendered.should contain %(<span class="event-name">Conference</span>)
+      end
+    end
+
     it "builds navigation links when a request is provided" do
       with_calendar_templates(include_request_context: true) do
         rendered = render_calendar_tag(

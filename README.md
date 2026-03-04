@@ -4,7 +4,7 @@
 [![Marten Calendar Specs](https://github.com/treagod/marten-calendar/actions/workflows/specs.yml/badge.svg)](https://github.com/treagod/marten-calendar/actions/workflows/specs.yml)
 [![QA](https://github.com/treagod/marten-calendar/actions/workflows/qa.yml/badge.svg)](https://github.com/treagod/marten-calendar/actions/workflows/qa.yml)
 
-Marten Calendar is a Marten extension that provides the foundation for calendar- and scheduling-related features such as navigation between months, localized rendering, and (soon) event decoration. It is designed to get a production-ready month calendar on the screen quickly while still giving you hooks to extend templates or replace rendering logic entirely.
+Marten Calendar is a Marten extension that provides the foundation for calendar- and scheduling-related features such as navigation between months, localized rendering, and event decoration. It is designed to get a production-ready month calendar on the screen quickly while still giving you hooks to extend templates or replace rendering logic entirely.
 
 > **Note**: This shard is currently in its early stages. Documentation, features, and usage examples will continue to evolve as the implementation is built out.
 
@@ -12,7 +12,7 @@ Marten Calendar is a Marten extension that provides the foundation for calendar-
 
 - [x] Current calendar rendering functionality
 - [x] Localized labels and weekday/month translations
-- [ ] Month calendar event support
+- [x] Month calendar event support
 - [x] Ready to use CSS Styling
 
 ## Installation
@@ -46,7 +46,7 @@ config.installed_apps = [
 
 ### Template tag
 
-This shard registers a `calendar` template tag. It renders a month grid that handles navigation helpers, optional min/max date constraints, and localized parsing for strings. By default the tag renders the templates that ship in `MartenCalendar::App`, but you can point it to custom templates via settings:
+This shard registers a `calendar` template tag. It renders a month grid that handles navigation helpers, optional min/max date constraints, and date parsing for strings based on `Marten.settings.date_input_formats`. By default the tag renders the templates that ship in `MartenCalendar::App`, but you can point it to custom templates via settings:
 
 ```crystal
 Marten.settings.calendar.template_path = "calendar/month_calendar.html"
@@ -67,9 +67,10 @@ Supported kwargs include:
 | `month` | String or Int | Current month | Optional month number (1-12). Provide with `year` to jump to a specific month. |
 | `week_start` | String | Monday | Set to `sunday` to render Sunday-first; any other value keeps Monday-first. |
 | `fill_adjacent` | `Bool` | `false` | When `true` pads the first and last rows with adjacent-month days instead of blanks. |
-| `min` | Time or String | `nil` | Smallest selectable day; accepts `Time` objects or ISO/localized strings (or `nil` to disable the constraint). |
+| `min` | Time or String | `nil` | Smallest selectable day; accepts `Time` objects or strings parseable with `Marten.settings.date_input_formats` (or `nil` to disable the constraint). |
 | `max` | Time or String | `nil` | Largest selectable day; same parsing rules as `min` (or `nil` to disable). |
 | `default` | Time or String | `nil` | Initially selected day; leave unset for no selection. |
+| `events` | Iterable | `[]` | Events to attach to day cells. Each event must expose `start_time` and can optionally expose `end_time` for multi-day spans. |
 | `template` | String | `Marten.settings.calendar.template_path` | Override the wrapper template path used for the whole calendar. |
 | `cell_template` | String | `Marten.settings.calendar.cell_template_path` | Override the per-day cell template path. |
 
@@ -79,6 +80,46 @@ The shard also ships with a ready-to-use stylesheet that you can load via your a
 
 ```html
 <link rel="stylesheet" type="text/css" href="{% asset 'css/calendar/calendar.css' %}" />
+```
+
+### Rendering events
+
+To render events, pass an iterable through the `events` kwarg:
+
+```django
+{% calendar events: meetings %}
+```
+
+Each event object must expose:
+
+- `start_time`: required, date-like value (`Time` or string parseable by `Marten.settings.date_input_formats`)
+- `end_time`: optional, date-like value for multi-day rendering
+
+Multi-day events are rendered on each day in the inclusive range from `start_time` to `end_time`. If `end_time` is absent or `nil`, the event is rendered on `start_time` only.
+
+If an event is missing `start_time`, has an invalid date value, or has an `end_time` earlier than `start_time`, the tag raises `Marten::Template::Errors::UnsupportedValue`.
+
+`attribute` and `end_attribute` kwargs are not supported yet. For now, expose `start_time` / `end_time` on your model or object directly.
+
+If you need additional formats (for example `%d.%m.%Y`), add them to your app settings through `Marten.settings.date_input_formats`.
+
+You can render event content by using a custom cell template:
+
+```django
+{% calendar events: meetings, cell_template: "calendar/month_calendar_cell_with_events.html" %}
+```
+
+```django
+{# templates/calendar/month_calendar_cell_with_events.html #}
+<td class="{% if calendar_cell.blank? %}blank{% endif %}">
+  {% if not calendar_cell.blank? %}
+    <time datetime="{{ calendar_cell.iso }}">{{ calendar_cell.day }}</time>
+
+    {% for event in calendar_cell.events %}
+      <div class="calendar-event">{{ event.name }}</div>
+    {% endfor %}
+  {% endif %}
+</td>
 ```
 
 ### Internationalization
