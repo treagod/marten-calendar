@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.2.0 (2026-03-06)
+
 - Added month calendar event support via `{% calendar events: meetings %}`.
 - Added per-cell event exposure through `calendar_cell.events`.
 - Added support for single-day and multi-day events using `start_time` / optional `end_time`.
