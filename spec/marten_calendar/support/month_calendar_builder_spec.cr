@@ -289,5 +289,5 @@ private def cell_for_iso(
   calendar : MartenCalendar::Tags::Support::MonthCalendar,
   iso : String,
 ) : MartenCalendar::Tags::Support::CalendarCell
-  calendar.calendar_cells.flatten.find { |cell| cell.iso == iso }.not_nil!
+  calendar.calendar_cells.flatten.find! { |cell| cell.iso == iso }
 end

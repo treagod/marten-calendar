@@ -12,3 +12,5 @@ development_dependencies:
     version: ~> 1.6
   timecop:
     github: crystal-community/timecop.cr
+    commit: 85a4fb2
+
