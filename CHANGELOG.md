@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed default calendar month selection to respect `min`/`max` bounds when no explicit `year` or `month` is provided.
+
 ## 0.2.0 (2026-03-06)
 
 - Added month calendar event support via `{% calendar events: meetings %}`.

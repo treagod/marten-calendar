@@ -9,14 +9,20 @@ module MartenCalendar
         end
 
         def resolve : CalendarConfig
-          year_in = resolve_int("year") || Time.local.year
-          month_in = resolve_int("month") || Time.local.month
+          year_kwarg = resolve_int("year")
+          month_kwarg = resolve_int("month")
+          year_in = year_kwarg || Time.local.year
+          month_in = month_kwarg || Time.local.month
           year, month = normalize_year_month(year_in, month_in)
 
           monday_start = parse_week_start(resolve_str("week_start"))
           fill_adjacent = resolve_bool("fill_adjacent", false)
           min_date = resolve_date("min")
           max_date = resolve_date("max")
+          if year_kwarg.nil? && month_kwarg.nil?
+            year, month = clamp_year_month_to_bounds(year, month, min_date, max_date)
+          end
+
           default_date = resolve_date("default")
           events = resolve_events("events")
 
@@ -40,6 +46,25 @@ module MartenCalendar
         private def normalize_year_month(y : Int32, m : Int32) : {Int32, Int32}
           q, r = (m - 1).divmod(12)
           {y + q, r + 1}
+        end
+
+        private def clamp_year_month_to_bounds(
+          year : Int32,
+          month : Int32,
+          min_date : Time?,
+          max_date : Time?,
+        ) : {Int32, Int32}
+          current = {year, month}
+
+          if min_date && current < {min_date.not_nil!.year, min_date.not_nil!.month}
+            return {min_date.not_nil!.year, min_date.not_nil!.month}
+          end
+
+          if max_date && current > {max_date.not_nil!.year, max_date.not_nil!.month}
+            return {max_date.not_nil!.year, max_date.not_nil!.month}
+          end
+
+          {year, month}
         end
 
         private def resolve_int(key) : Int32?

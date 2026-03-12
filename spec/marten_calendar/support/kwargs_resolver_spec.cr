@@ -21,6 +21,52 @@ describe MartenCalendar::Tags::Support::KwargsResolver do
       end
     end
 
+    it "clamps default month and year to the min date when current month is earlier" do
+      Timecop.freeze(Time.local(2026, 3, 11)) do
+        context = Marten::Template::Context.from({} of String => Int32)
+        kwargs = {
+          "min" => Marten::Template::FilterExpression.new("'2026-07-06'"),
+        } of String => Marten::Template::FilterExpression
+
+        resolver = MartenCalendar::Tags::Support::KwargsResolver.new(kwargs, context)
+        config = resolver.resolve
+
+        config.year.should eq 2026
+        config.month.should eq 7
+      end
+    end
+
+    it "clamps default month and year to the max date when current month is later" do
+      Timecop.freeze(Time.local(2026, 10, 11)) do
+        context = Marten::Template::Context.from({} of String => Int32)
+        kwargs = {
+          "max" => Marten::Template::FilterExpression.new("'2026-07-06'"),
+        } of String => Marten::Template::FilterExpression
+
+        resolver = MartenCalendar::Tags::Support::KwargsResolver.new(kwargs, context)
+        config = resolver.resolve
+
+        config.year.should eq 2026
+        config.month.should eq 7
+      end
+    end
+
+    it "does not clamp explicitly provided month and year to date bounds" do
+      context = Marten::Template::Context.from({} of String => Int32)
+      kwargs = {
+        "year"  => Marten::Template::FilterExpression.new("2026"),
+        "month" => Marten::Template::FilterExpression.new("3"),
+        "min"   => Marten::Template::FilterExpression.new("'2026-07-06'"),
+        "max"   => Marten::Template::FilterExpression.new("'2026-08-06'"),
+      } of String => Marten::Template::FilterExpression
+
+      resolver = MartenCalendar::Tags::Support::KwargsResolver.new(kwargs, context)
+      config = resolver.resolve
+
+      config.year.should eq 2026
+      config.month.should eq 3
+    end
+
     it "parses explicit kwargs and date constraints" do
       context = Marten::Template::Context.from({} of String => Int32)
       kwargs = {
