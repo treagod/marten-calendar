@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.2.1 (2026-03-12)
+
 - Fixed default calendar month selection to respect `min`/`max` bounds when no explicit `year` or `month` is provided.
 
 ## 0.2.0 (2026-03-06)

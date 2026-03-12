@@ -56,12 +56,14 @@ module MartenCalendar
         ) : {Int32, Int32}
           current = {year, month}
 
-          if min_date && current < {min_date.not_nil!.year, min_date.not_nil!.month}
-            return {min_date.not_nil!.year, min_date.not_nil!.month}
+          if min = min_date
+            min_bounds = {min.year, min.month}
+            return min_bounds if current < min_bounds
           end
 
-          if max_date && current > {max_date.not_nil!.year, max_date.not_nil!.month}
-            return {max_date.not_nil!.year, max_date.not_nil!.month}
+          if max = max_date
+            max_bounds = {max.year, max.month}
+            return max_bounds if current > max_bounds
           end
 
           {year, month}
