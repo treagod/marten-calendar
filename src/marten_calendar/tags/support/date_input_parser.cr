@@ -37,15 +37,19 @@ module MartenCalendar
           cleaned = value.strip
           return nil if cleaned.empty?
 
-          if parsed = parse_iso_date(cleaned) || parse_configured_date(cleaned)
-            normalize_date(parsed)
-          end
+          parse_iso_date(cleaned) || parse_configured_date(cleaned).try { |parsed| normalize_date(parsed) }
         end
 
         private def parse_iso_date(value : String) : Time?
+          if timestamp = parse_rfc3339(value)
+            return normalize_date(timestamp)
+          end
+
           return nil unless value.bytesize >= 10
 
-          # Intentionally accepts date-time strings by parsing the YYYY-MM-DD prefix.
+          # Date-only strings carry no offset: their day is taken as-is, never shifted.
+          # Date-time strings without an offset are wall time in the configured time zone,
+          # whose calendar day is exactly the YYYY-MM-DD prefix.
           iso = value[0, 10]
           return nil unless iso[4] == '-' && iso[7] == '-'
 
@@ -56,6 +60,12 @@ module MartenCalendar
 
           Time.utc(y, m, d)
         rescue ArgumentError
+          nil
+        end
+
+        private def parse_rfc3339(value : String) : Time?
+          Time.parse_rfc3339(value)
+        rescue Time::Format::Error
           nil
         end
 
@@ -94,7 +104,9 @@ module MartenCalendar
         end
 
         private def normalize_date(value : Time) : Time
-          Time.utc(value.year, value.month, value.day)
+          local = value.in(Marten.settings.time_zone)
+
+          Time.utc(local.year, local.month, local.day)
         end
       end
     end

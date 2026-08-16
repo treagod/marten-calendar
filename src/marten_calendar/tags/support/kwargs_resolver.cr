@@ -13,13 +13,15 @@ module MartenCalendar
           month_kwarg = resolve_int("month")
           request_year_month = (year_kwarg || month_kwarg) ? nil : resolve_request_year_month
 
+          today = DateInputParser.parse(Time.utc)
+
           year_in, month_in =
             if year_kwarg || month_kwarg
-              {year_kwarg || Time.local.year, month_kwarg || Time.local.month}
+              {year_kwarg || today.year, month_kwarg || today.month}
             elsif rym = request_year_month
               rym
             else
-              {Time.local.year, Time.local.month}
+              {today.year, today.month}
             end
           year, month = normalize_year_month(year_in, month_in)
 

@@ -11,6 +11,7 @@ module MartenCalendar
       alias CalendarCell = Support::CalendarCell
       alias MonthCalendar = Support::MonthCalendar
       alias CalendarConfig = Support::CalendarConfig
+      alias DateInputParser = Support::DateInputParser
       alias KwargsResolver = Support::KwargsResolver
       alias MonthCalendarBuilder = Support::MonthCalendarBuilder
 
@@ -23,7 +24,7 @@ module MartenCalendar
       def render(context : Marten::Template::Context) : String
         config = KwargsResolver.new(@kwargs, context).resolve
 
-        builder = MonthCalendarBuilder.new(config, today_utc)
+        builder = MonthCalendarBuilder.new(config, today)
         month_calendar = builder.build
 
         next_path, previous_path = build_nav_paths(
@@ -42,8 +43,8 @@ module MartenCalendar
         })
       end
 
-      private def today_utc : Time
-        Time.local.to_utc
+      private def today : Time
+        DateInputParser.parse(Time.utc)
       end
 
       private def build_nav_paths(

@@ -36,6 +36,23 @@ describe MartenCalendar::Tags::CalendarTag do
       rendered.should contain "year=2026&amp;month=7"
     end
   end
+
+  it "marks today based on the configured time zone" do
+    snapshot = Marten.settings.time_zone
+    begin
+      Marten.settings.time_zone = Time::Location.load("Europe/Berlin")
+
+      Timecop.freeze(Time.utc(2026, 7, 18, 23, 30)) do
+        with_calendar_templates do
+          rendered = render_calendar_tag_without_request("{% calendar year: 2026, month: 7 %}")
+
+          rendered.should match /aria-current="date"[\s\S]*?datetime="2026-07-19"/
+        end
+      end
+    ensure
+      Marten.settings.time_zone = snapshot
+    end
+  end
 end
 
 private def render_calendar_tag_without_request(source)
