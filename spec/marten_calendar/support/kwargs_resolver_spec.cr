@@ -218,5 +218,90 @@ describe MartenCalendar::Tags::Support::KwargsResolver do
         resolver.resolve
       end
     end
+
+    it "uses request year and month when no explicit values are provided" do
+      Timecop.freeze(Time.local(2024, 5, 10)) do
+        config = resolve_with_request("/calendar?year=2026&month=8")
+
+        config.year.should eq 2026
+        config.month.should eq 8
+      end
+    end
+
+    it "gives precedence to explicit year and month over request values" do
+      config = resolve_with_request(
+        "/calendar?year=2026&month=8",
+        {
+          "year"  => Marten::Template::FilterExpression.new("2027"),
+          "month" => Marten::Template::FilterExpression.new("2"),
+        } of String => Marten::Template::FilterExpression
+      )
+
+      config.year.should eq 2027
+      config.month.should eq 2
+    end
+
+    it "ignores request values when only an explicit year is provided" do
+      Timecop.freeze(Time.local(2024, 5, 10)) do
+        config = resolve_with_request(
+          "/calendar?year=2026&month=8",
+          {"year" => Marten::Template::FilterExpression.new("2027")} of String => Marten::Template::FilterExpression
+        )
+
+        config.year.should eq 2027
+        config.month.should eq 5
+      end
+    end
+
+    it "ignores request values when only an explicit month is provided" do
+      Timecop.freeze(Time.local(2024, 5, 10)) do
+        config = resolve_with_request(
+          "/calendar?year=2026&month=8",
+          {"month" => Marten::Template::FilterExpression.new("2")} of String => Marten::Template::FilterExpression
+        )
+
+        config.year.should eq 2024
+        config.month.should eq 2
+      end
+    end
+
+    it "ignores out-of-range and non-numeric request months" do
+      Timecop.freeze(Time.local(2024, 5, 10)) do
+        resolve_with_request("/calendar?year=2026&month=13").month.should eq 5
+        resolve_with_request("/calendar?year=2026&month=abc").month.should eq 5
+      end
+    end
+
+    it "ignores incomplete request year and month pairs" do
+      Timecop.freeze(Time.local(2024, 5, 10)) do
+        config = resolve_with_request("/calendar?year=2026")
+
+        config.year.should eq 2024
+        config.month.should eq 5
+      end
+    end
+
+    it "does not clamp request year and month to date bounds" do
+      config = resolve_with_request(
+        "/calendar?year=2026&month=3",
+        {
+          "min" => Marten::Template::FilterExpression.new("'2026-07-06'"),
+          "max" => Marten::Template::FilterExpression.new("'2026-08-06'"),
+        } of String => Marten::Template::FilterExpression
+      )
+
+      config.year.should eq 2026
+      config.month.should eq 3
+    end
   end
+end
+
+private def resolve_with_request(
+  path : String,
+  kwargs = {} of String => Marten::Template::FilterExpression,
+)
+  context = Marten::Template::Context.from({} of String => Int32)
+  context[:request] = Marten::Template::Value.from(build_http_request(path))
+
+  MartenCalendar::Tags::Support::KwargsResolver.new(kwargs, context).resolve
 end

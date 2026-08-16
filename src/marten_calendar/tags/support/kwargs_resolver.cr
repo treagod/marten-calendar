@@ -11,15 +11,23 @@ module MartenCalendar
         def resolve : CalendarConfig
           year_kwarg = resolve_int("year")
           month_kwarg = resolve_int("month")
-          year_in = year_kwarg || Time.local.year
-          month_in = month_kwarg || Time.local.month
+          request_year_month = (year_kwarg || month_kwarg) ? nil : resolve_request_year_month
+
+          year_in, month_in =
+            if year_kwarg || month_kwarg
+              {year_kwarg || Time.local.year, month_kwarg || Time.local.month}
+            elsif rym = request_year_month
+              rym
+            else
+              {Time.local.year, Time.local.month}
+            end
           year, month = normalize_year_month(year_in, month_in)
 
           monday_start = parse_week_start(resolve_str("week_start"))
           fill_adjacent = resolve_bool("fill_adjacent", false)
           min_date = resolve_date("min")
           max_date = resolve_date("max")
-          if year_kwarg.nil? && month_kwarg.nil?
+          if year_kwarg.nil? && month_kwarg.nil? && request_year_month.nil?
             year, month = clamp_year_month_to_bounds(year, month, min_date, max_date)
           end
 
@@ -41,6 +49,19 @@ module MartenCalendar
             cell_template_path,
             events
           )
+        end
+
+        private def resolve_request_year_month : {Int32, Int32}?
+          request = @context[:request]?.try(&.raw)
+          return unless request.is_a?(Marten::HTTP::Request)
+
+          year = request.query_params["year"]?.try(&.to_i?)
+          month = request.query_params["month"]?.try(&.to_i?)
+
+          return unless year && month
+          return unless (1..12).includes?(month)
+
+          {year, month}
         end
 
         private def normalize_year_month(y : Int32, m : Int32) : {Int32, Int32}
