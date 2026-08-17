@@ -63,16 +63,22 @@ Supported kwargs include:
 
 | Kwarg | Type | Default | Description |
 | --- | --- | --- | --- |
-| `year` | String or Int | Current year | Optional target year. Accepts literals or values pulled from the template context. |
-| `month` | String or Int | Current month | Optional month number (1-12). Provide with `year` to jump to a specific month. |
-| `week_start` | String | Monday | Set to `sunday` to render Sunday-first; any other value keeps Monday-first. |
-| `fill_adjacent` | `Bool` | `false` | When `true` pads the first and last rows with adjacent-month days instead of blanks. |
+| `year` | String or Int | Current year | Optional target year; must be positive. Accepts literals or values pulled from the template context. |
+| `month` | String or Int | Current month | Optional month number; must be between 1 and 12. Provide with `year` to jump to a specific month. |
+| `week_start` | String | Monday | `monday` or `sunday` (case-insensitive). Set to `sunday` to render Sunday-first. |
+| `fill_adjacent` | `Bool` | `false` | When `true` pads the first and last rows with adjacent-month days instead of blanks. Also accepts `1`/`0`, `yes`/`no`, `on`/`off`, `y`/`n`, `t`/`f`. |
 | `min` | Time or String | `nil` | Smallest selectable day; accepts `Time` objects or strings parseable with `Marten.settings.date_input_formats` (or `nil` to disable the constraint). |
 | `max` | Time or String | `nil` | Largest selectable day; same parsing rules as `min` (or `nil` to disable). |
 | `default` | Time or String | `nil` | Initially selected day; leave unset for no selection. |
 | `events` | Iterable | `[]` | Events to attach to day cells. Each event must expose `start_time` and can optionally expose `end_time` for multi-day spans. |
 | `template` | String | `Marten.settings.calendar.template_path` | Override the wrapper template path used for the whole calendar. |
 | `cell_template` | String | `Marten.settings.calendar.cell_template_path` | Override the per-day cell template path. |
+
+Tag arguments are developer configuration and are validated strictly: unknown kwargs, unparseable or out-of-range `year`/`month` values, an unsupported `week_start` or `fill_adjacent` value, and a `min` that is after `max` all raise `Marten::Template::Errors::UnsupportedValue`. A `min` equal to `max` is valid and leaves exactly one selectable day. A `default` outside of `min`/`max` is allowed as well — the calendar renders with no day selected.
+
+Values pulled from the template context that resolve to `nil` count as unset, so optional context variables keep the defaults.
+
+Query parameters stay lenient by comparison: when no explicit `year`/`month` is given, the tag picks them up from the request, and invalid values such as `?year=nonsense&month=42` are simply ignored.
 
 ![Basic calendar screenshot](basic-calendar.png)
 

@@ -2,6 +2,23 @@ module MartenCalendar
   module Tags
     module Support
       class KwargsResolver
+        SUPPORTED_KWARGS = Set{
+          "year",
+          "month",
+          "week_start",
+          "fill_adjacent",
+          "min",
+          "max",
+          "default",
+          "events",
+          "template",
+          "cell_template",
+        }
+
+        TRUE_VALUES = {"1", "true", "t", "yes", "y", "on"}
+
+        FALSE_VALUES = {"0", "false", "f", "no", "n", "off"}
+
         def initialize(
           @kwargs : Hash(String, Marten::Template::FilterExpression),
           @context : Marten::Template::Context,
@@ -9,8 +26,13 @@ module MartenCalendar
         end
 
         def resolve : CalendarConfig
+          validate_kwargs!
+
           year_kwarg = resolve_int("year")
           month_kwarg = resolve_int("month")
+          validate_year!(year_kwarg)
+          validate_month!(month_kwarg)
+
           request_year_month = (year_kwarg || month_kwarg) ? nil : resolve_request_year_month
 
           today = DateInputParser.parse(Time.utc)
@@ -23,12 +45,14 @@ module MartenCalendar
             else
               {today.year, today.month}
             end
-          year, month = normalize_year_month(year_in, month_in)
+          year, month = year_in, month_in
 
           monday_start = parse_week_start(resolve_str("week_start"))
           fill_adjacent = resolve_bool("fill_adjacent", false)
           min_date = resolve_date("min")
           max_date = resolve_date("max")
+          validate_date_bounds!(min_date, max_date)
+
           if year_kwarg.nil? && month_kwarg.nil? && request_year_month.nil?
             year, month = clamp_year_month_to_bounds(year, month, min_date, max_date)
           end
@@ -53,6 +77,43 @@ module MartenCalendar
           )
         end
 
+        private def validate_kwargs!
+          @kwargs.each_key do |key|
+            next if SUPPORTED_KWARGS.includes?(key)
+
+            raise Marten::Template::Errors::UnsupportedValue.new(
+              "Unsupported calendar tag argument #{key.inspect}"
+            )
+          end
+        end
+
+        private def validate_year!(year : Int32?)
+          return unless year
+          return if year > 0
+
+          raise Marten::Template::Errors::UnsupportedValue.new(
+            "Invalid year value provided to calendar tag (expected a positive value, got #{year})"
+          )
+        end
+
+        private def validate_month!(month : Int32?)
+          return unless month
+          return if (1..12).includes?(month)
+
+          raise Marten::Template::Errors::UnsupportedValue.new(
+            "Invalid month value provided to calendar tag (expected a value between 1 and 12, got #{month})"
+          )
+        end
+
+        private def validate_date_bounds!(min_date : Time?, max_date : Time?)
+          return unless min_date && max_date
+          return unless min_date > max_date
+
+          raise Marten::Template::Errors::UnsupportedValue.new(
+            "Invalid calendar date range (min must not be after max)"
+          )
+        end
+
         private def resolve_request_year_month : {Int32, Int32}?
           request = @context[:request]?.try(&.raw)
           return unless request.is_a?(Marten::HTTP::Request)
@@ -61,14 +122,10 @@ module MartenCalendar
           month = request.query_params["month"]?.try(&.to_i?)
 
           return unless year && month
+          return unless year > 0
           return unless (1..12).includes?(month)
 
           {year, month}
-        end
-
-        private def normalize_year_month(y : Int32, m : Int32) : {Int32, Int32}
-          q, r = (m - 1).divmod(12)
-          {y + q, r + 1}
         end
 
         private def clamp_year_month_to_bounds(
@@ -92,22 +149,41 @@ module MartenCalendar
           {year, month}
         end
 
-        private def resolve_int(key) : Int32?
-          @kwargs[key]?.try { |f| f.resolve(@context).to_s.to_i? }
+        private def resolve_int(key : String) : Int32?
+          value = @kwargs[key]?.try(&.resolve(@context))
+          return if value.nil? || value.raw.nil?
+
+          if parsed = value.to_s.to_i?
+            return parsed
+          end
+
+          raise Marten::Template::Errors::UnsupportedValue.new(
+            "Invalid #{key} value provided to calendar tag (expected integer, got #{value.raw.inspect})"
+          )
         end
 
-        private def resolve_str(key) : String?
-          @kwargs[key]?.try { |f| f.resolve(@context).to_s }
+        private def resolve_str(key : String) : String?
+          value = @kwargs[key]?.try(&.resolve(@context))
+          return if value.nil? || value.raw.nil?
+
+          value.to_s
         end
 
-        private def resolve_bool(key, fallback : Bool) : Bool
-          raw = @kwargs[key]?.try(&.resolve(@context))
+        private def resolve_bool(key : String, fallback : Bool) : Bool
+          value = @kwargs[key]?.try(&.resolve(@context))
+          return fallback if value.nil?
+
+          raw = value.raw
+          return raw if raw.is_a?(Bool)
           return fallback if raw.nil?
-          case raw
-          when Bool then raw
+
+          case raw.to_s.downcase
+          when .in?(TRUE_VALUES)  then true
+          when .in?(FALSE_VALUES) then false
           else
-            s = raw.to_s.downcase
-            {"1", "true", "t", "yes", "y", "on"}.includes?(s)
+            raise Marten::Template::Errors::UnsupportedValue.new(
+              "Invalid #{key} value provided to calendar tag (expected a boolean, got #{raw.inspect})"
+            )
           end
         end
 
@@ -144,11 +220,17 @@ module MartenCalendar
           events
         end
 
-        private def parse_week_start(s : String?) : Bool
-          case s.try &.downcase
-          when "sunday"      then false
-          when "monday", nil then true
-          else                    true
+        private def parse_week_start(value : String?) : Bool
+          case value.try(&.downcase)
+          when nil, "monday"
+            true
+          when "sunday"
+            false
+          else
+            raise Marten::Template::Errors::UnsupportedValue.new(
+              "Invalid week_start value provided to calendar tag " \
+              "(expected \"monday\" or \"sunday\", got #{value.inspect})"
+            )
           end
         end
 

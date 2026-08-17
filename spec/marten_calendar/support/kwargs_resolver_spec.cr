@@ -293,7 +293,123 @@ describe MartenCalendar::Tags::Support::KwargsResolver do
       config.year.should eq 2026
       config.month.should eq 3
     end
+
+    it "raises for non-numeric explicit year and month values" do
+      expect_raises(Marten::Template::Errors::UnsupportedValue, /Invalid year value/) do
+        resolve_kwargs({"year" => "'foo'"})
+      end
+
+      expect_raises(Marten::Template::Errors::UnsupportedValue, /Invalid month value/) do
+        resolve_kwargs({"month" => "'foo'"})
+      end
+    end
+
+    it "raises for a year that is not positive" do
+      expect_raises(Marten::Template::Errors::UnsupportedValue, /expected a positive value/) do
+        resolve_kwargs({"year" => "0"})
+      end
+    end
+
+    it "raises for months outside of 1..12" do
+      expect_raises(Marten::Template::Errors::UnsupportedValue, /between 1 and 12/) do
+        resolve_kwargs({"month" => "0"})
+      end
+
+      expect_raises(Marten::Template::Errors::UnsupportedValue, /between 1 and 12/) do
+        resolve_kwargs({"month" => "13"})
+      end
+    end
+
+    it "raises for an unsupported week_start value" do
+      expect_raises(Marten::Template::Errors::UnsupportedValue, /week_start/) do
+        resolve_kwargs({"week_start" => "'sundya'"})
+      end
+    end
+
+    it "resolves week_start case-insensitively" do
+      resolve_kwargs({"week_start" => "'SUNDAY'"}).monday_start?.should be_false
+      resolve_kwargs({"week_start" => "'Monday'"}).monday_start?.should be_true
+    end
+
+    it "raises for an unsupported fill_adjacent value" do
+      expect_raises(Marten::Template::Errors::UnsupportedValue, /fill_adjacent/) do
+        resolve_kwargs({"fill_adjacent" => "'whatever'"})
+      end
+    end
+
+    it "accepts the documented boolean representations" do
+      {"'on'", "'yes'", "'t'", "1", "true"}.each do |source|
+        resolve_kwargs({"fill_adjacent" => source}).fill_adjacent?.should be_true
+      end
+
+      {"'off'", "'no'", "'f'", "0", "false"}.each do |source|
+        resolve_kwargs({"fill_adjacent" => source}).fill_adjacent?.should be_false
+      end
+    end
+
+    it "raises when min is after max" do
+      expect_raises(Marten::Template::Errors::UnsupportedValue, /min must not be after max/) do
+        resolve_kwargs({"min" => "'2026-08-10'", "max" => "'2026-08-09'"})
+      end
+    end
+
+    it "accepts min equal to max" do
+      config = resolve_kwargs({"min" => "'2026-08-10'", "max" => "'2026-08-10'"})
+
+      config.min_date.should eq Time.utc(2026, 8, 10)
+      config.max_date.should eq Time.utc(2026, 8, 10)
+    end
+
+    it "allows a default outside of the min and max bounds" do
+      config = resolve_kwargs({"min" => "'2026-08-10'", "default" => "'2026-08-05'"})
+
+      config.default_date.should eq Time.utc(2026, 8, 5)
+    end
+
+    it "raises for unknown kwargs" do
+      expect_raises(Marten::Template::Errors::UnsupportedValue, /Unsupported calendar tag argument "fill_adjecent"/) do
+        resolve_kwargs({"fill_adjecent" => "true"})
+      end
+    end
+
+    it "keeps ignoring invalid request year and month values" do
+      Timecop.freeze(Time.local(2024, 5, 10)) do
+        config = resolve_with_request("/calendar?year=nonsense&month=42")
+
+        config.year.should eq 2024
+        config.month.should eq 5
+
+        resolve_with_request("/calendar?year=0&month=3").year.should eq 2024
+      end
+    end
+
+    it "treats nil context values as unset kwargs" do
+      Timecop.freeze(Time.local(2024, 5, 10)) do
+        context = Marten::Template::Context.from({"maybe" => nil})
+        kwargs = {
+          "year"       => Marten::Template::FilterExpression.new("maybe"),
+          "week_start" => Marten::Template::FilterExpression.new("maybe"),
+          "template"   => Marten::Template::FilterExpression.new("maybe"),
+        } of String => Marten::Template::FilterExpression
+
+        config = MartenCalendar::Tags::Support::KwargsResolver.new(kwargs, context).resolve
+
+        config.year.should eq 2024
+        config.monday_start?.should be_true
+        config.template_path.should eq "marten_calendar/month_calendar.html"
+      end
+    end
   end
+end
+
+private def resolve_kwargs(sources : Hash(String, String))
+  kwargs = {} of String => Marten::Template::FilterExpression
+  sources.each { |key, source| kwargs[key] = Marten::Template::FilterExpression.new(source) }
+
+  MartenCalendar::Tags::Support::KwargsResolver.new(
+    kwargs,
+    Marten::Template::Context.from({} of String => Int32)
+  ).resolve
 end
 
 private def resolve_with_request(
