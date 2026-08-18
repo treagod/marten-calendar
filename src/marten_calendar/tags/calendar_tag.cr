@@ -32,7 +32,9 @@ module MartenCalendar
           prev_year: month_calendar.prev_year,
           prev_month: month_calendar.prev_month,
           next_year: month_calendar.next_year,
-          next_month: month_calendar.next_month
+          next_month: month_calendar.next_month,
+          min_date: config.min_date,
+          max_date: config.max_date
         )
 
         Marten.templates.get_template(config.template_path).render({
@@ -53,6 +55,8 @@ module MartenCalendar
         prev_month : Int32,
         next_year : Int32,
         next_month : Int32,
+        min_date : Time?,
+        max_date : Time?,
       ) : {String?, String?}
         request_wrapper = context[:request]?
         return {nil, nil} unless request_wrapper
@@ -68,10 +72,32 @@ module MartenCalendar
         base_uri = URI.parse(req.full_path.dup)
         base_params = extract_query_params(base_uri)
 
-        next_uri = build_month_year_uri(base_uri, base_params, next_year, next_month)
-        prev_uri = build_month_year_uri(base_uri, base_params, prev_year, prev_month)
+        next_uri =
+          if month_selectable?(next_year, next_month, min_date, max_date)
+            build_month_year_uri(base_uri, base_params, next_year, next_month)
+          end
+
+        prev_uri =
+          if month_selectable?(prev_year, prev_month, min_date, max_date)
+            build_month_year_uri(base_uri, base_params, prev_year, prev_month)
+          end
 
         {next_uri, prev_uri}
+      end
+
+      private def month_selectable?(
+        year : Int32,
+        month : Int32,
+        min_date : Time?,
+        max_date : Time?,
+      ) : Bool
+        month_start = Time.utc(year, month, 1)
+        month_end = Time.utc(year, month, Time.days_in_month(year, month))
+
+        return false if min_date && month_end < min_date
+        return false if max_date && month_start > max_date
+
+        true
       end
 
       private def extract_query_params(uri : URI) : URI::Params

@@ -53,6 +53,76 @@ describe MartenCalendar::Tags::CalendarTag do
       Marten.settings.time_zone = snapshot
     end
   end
+
+  it "keeps both navigation links when no bounds are given" do
+    with_calendar_templates do
+      rendered = render_calendar_with_request("{% calendar year: 2026, month: 8 %}")
+
+      rendered.should contain %(class="nav-prev")
+      rendered.should contain %(class="nav-next")
+    end
+  end
+
+  it "hides the previous link when the previous month is entirely before min" do
+    with_calendar_templates do
+      rendered = render_calendar_with_request(%({% calendar year: 2026, month: 8, min: "2026-08-01" %}))
+
+      rendered.should_not contain %(class="nav-prev")
+      rendered.should contain %(class="nav-next")
+    end
+  end
+
+  it "hides the next link when the next month is entirely after max" do
+    with_calendar_templates do
+      rendered = render_calendar_with_request(%({% calendar year: 2026, month: 8, max: "2026-08-31" %}))
+
+      rendered.should contain %(class="nav-prev")
+      rendered.should_not contain %(class="nav-next")
+    end
+  end
+
+  it "keeps the previous link when a single day of the previous month is selectable" do
+    with_calendar_templates do
+      rendered = render_calendar_with_request(%({% calendar year: 2026, month: 8, min: "2026-07-31" %}))
+
+      rendered.should contain %(class="nav-prev")
+    end
+  end
+
+  it "keeps the next link when a single day of the next month is selectable" do
+    with_calendar_templates do
+      rendered = render_calendar_with_request(%({% calendar year: 2026, month: 7, max: "2026-08-01" %}))
+
+      rendered.should contain %(class="nav-next")
+    end
+  end
+
+  it "handles the year boundary for min" do
+    with_calendar_templates do
+      rendered = render_calendar_with_request(%({% calendar year: 2026, month: 1, min: "2025-12-31" %}))
+      rendered.should contain %(class="nav-prev")
+
+      rendered = render_calendar_with_request(%({% calendar year: 2026, month: 1, min: "2026-01-01" %}))
+      rendered.should_not contain %(class="nav-prev")
+    end
+  end
+
+  it "handles the year boundary for max" do
+    with_calendar_templates do
+      rendered = render_calendar_with_request(%({% calendar year: 2026, month: 12, max: "2027-01-01" %}))
+      rendered.should contain %(class="nav-next")
+
+      rendered = render_calendar_with_request(%({% calendar year: 2026, month: 12, max: "2026-12-31" %}))
+      rendered.should_not contain %(class="nav-next")
+    end
+  end
+end
+
+private def render_calendar_with_request(source : String)
+  context = Marten::Template::Context.from({} of String => Int32)
+  context[:request] = Marten::Template::Value.from(build_http_request("/calendar"))
+
+  render_calendar_tag_with_context(context: context, source: source)
 end
 
 private def render_calendar_tag_without_request(source)

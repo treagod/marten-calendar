@@ -78,6 +78,8 @@ Tag arguments are developer configuration and are validated strictly: unknown kw
 
 Values pulled from the template context that resolve to `nil` count as unset, so optional context variables keep the defaults.
 
+Navigation respects those bounds: the previous or next link is omitted when the target month contains no day within `min`/`max`. The links always point at the immediately adjacent month — the calendar never skips over out-of-range months.
+
 Query parameters stay lenient by comparison: when no explicit `year`/`month` is given, the tag picks them up from the request, and invalid values such as `?year=nonsense&month=42` are simply ignored.
 
 ![Basic calendar screenshot](basic-calendar.png)
